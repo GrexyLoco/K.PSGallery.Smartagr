@@ -898,13 +898,13 @@ function Get-PreReleaseSuffixFromCommits {
             }
         }
         
-        # Priority logic: beta > alpha (beta is more mature)
-        if ($foundSuffixes -contains "beta") {
-            Write-SafeInfoLog -Message "Multiple prerelease suffixes found, selecting 'beta' (higher priority)"
-            return "beta"
-        } elseif ($foundSuffixes -contains "alpha") {
-            Write-SafeInfoLog -Message "Alpha prerelease suffix selected"
+        # Priority logic: alpha > beta (most unstable wins - a release is only as stable as its weakest component)
+        if ($foundSuffixes -contains "alpha") {
+            Write-SafeInfoLog -Message "Alpha prerelease suffix selected (any alpha feature makes whole release alpha)"
             return "alpha"
+        } elseif ($foundSuffixes -contains "beta") {
+            Write-SafeInfoLog -Message "Beta prerelease suffix selected (all features are beta-stable)"
+            return "beta"
         }
         
         Write-SafeDebugLog -Message "No prerelease keywords found in commit messages"
