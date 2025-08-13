@@ -1,5 +1,46 @@
 # TestHelper.ps1 - Common test utilities for K.PSGallery.SemanticVersioning
 
+function Get-CrossPlatformTempPath {
+    <#
+    .SYNOPSIS
+    Gets a cross-platform compatible temporary directory path
+    #>
+    [CmdletBinding()]
+    param(
+        [string]$Suffix = "$(Get-Random)"
+    )
+    
+    if ($env:TEMP) {
+        return Join-Path $env:TEMP $Suffix
+    } elseif ($env:TMPDIR) {
+        return Join-Path $env:TMPDIR $Suffix  
+    } else {
+        return Join-Path (Get-Location) "temp/$Suffix"
+    }
+}
+
+function New-CrossPlatformTempDirectory {
+    <#
+    .SYNOPSIS
+    Creates a cross-platform compatible temporary directory
+    #>
+    [CmdletBinding()]
+    param(
+        [string]$Prefix = "TempDir",
+        [switch]$Force
+    )
+    
+    $tempPath = Get-CrossPlatformTempPath -Suffix "${Prefix}_$(Get-Random)"
+    $parentDir = Split-Path $tempPath -Parent
+    
+    if (-not (Test-Path $parentDir)) {
+        New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+    }
+    
+    New-Item -ItemType Directory -Path $tempPath -Force:$Force | Out-Null
+    return $tempPath
+}
+
 function Initialize-TestModule {
     <#
     .SYNOPSIS

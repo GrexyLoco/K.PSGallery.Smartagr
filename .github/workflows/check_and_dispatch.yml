@@ -20,7 +20,10 @@ jobs:
     name: 🔐 Security & 🧪 Tests
     runs-on: ${{ vars.UBUNTU_VERSION }}
     outputs:
-      tests-passed: ${{ steps.tests.outputs.passed }}
+      test-success: ${{ steps.tests.outputs.test-success }}
+      total-tests: ${{ steps.tests.outputs.total-tests }}
+      passed-tests: ${{ steps.tests.outputs.passed-tests }}
+      failed-tests: ${{ steps.tests.outputs.failed-tests }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -38,20 +41,36 @@ jobs:
           VALIDATE_ALL_CODEBASE: false
           VALIDATE_POWERSHELL: true
 
-      - name: 🧪 Run Pester tests
+      - name: 🔧 Setup Clean Test Environment
+        shell: pwsh
+        run: |
+          & "./.github/Scripts/Setup-CleanTestEnvironment.ps1" -TestPath "./Tests" -OutputPath "./TestResults.xml"
+
+      - name: 🧪 Run Clean Pester Tests
         id: tests
         shell: pwsh
         run: |
-            Install-Module Pester -Force -Scope CurrentUser
-            Install-Module K.PSGallery.LoggingModule -Force -Scope CurrentUser
-            Invoke-Pester -Path './Tests' -Output Detailed
-            echo "passed=true" >> $env:GITHUB_OUTPUT
+          & "./.github/Scripts/Invoke-CleanPesterTests.ps1" -TestPath "./Tests" -OutputPath "./TestResults.xml"
+
+      - name: 📋 Generate Test Summary  
+        if: always()
+        shell: pwsh
+        run: |
+          & "./.github/Scripts/Generate-TestSummary.ps1" -TotalTests '${{ steps.tests.outputs.total-tests }}' -PassedTests '${{ steps.tests.outputs.passed-tests }}' -FailedTests '${{ steps.tests.outputs.failed-tests }}' -SkippedTests '${{ steps.tests.outputs.skipped-tests }}' -Duration '${{ steps.tests.outputs.test-duration }}' -TestResultsPath '${{ steps.tests.outputs.test-results-path }}'
+
+      - name: 📄 Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults.xml
+          retention-days: 30
 
   dispatch:
     name: 🚀 Trigger Auto-Publish Pipeline
     runs-on: ubuntu-latest
     needs: validate
-    if: needs.validate.outputs.tests-passed == 'true'
+    if: needs.validate.outputs.test-success == 'true'
     steps:
       - name: 📤 Dispatch to auto-publish workflow
         uses: peter-evans/repository-dispatch@v3

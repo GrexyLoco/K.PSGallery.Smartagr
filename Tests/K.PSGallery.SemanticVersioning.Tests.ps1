@@ -6,6 +6,9 @@ Describe "K.PSGallery.SemanticVersioning Module Tests" {
         # Ensure clean module state at start
         Get-Module K.PSGallery.SemanticVersioning | Remove-Module -Force -ErrorAction SilentlyContinue
         
+        # Import temp path helper functions
+        . (Join-Path $PSScriptRoot "TempPathHelper.ps1")
+        
         # Import the module under test using absolute path
         $ModuleRoot = Split-Path $PSScriptRoot -Parent
         $ModulePath = Join-Path $ModuleRoot "K.PSGallery.SemanticVersioning.psd1"
@@ -108,14 +111,7 @@ Describe "K.PSGallery.SemanticVersioning Module Tests" {
         
         It "Should handle missing manifest path gracefully" {
             # Test in directory without .psd1 files
-            $EmptyDir = if ($env:TEMP) { 
-                Join-Path $env:TEMP "EmptyTestDir_$(Get-Random)" 
-            } elseif ($env:TMPDIR) { 
-                Join-Path $env:TMPDIR "EmptyTestDir_$(Get-Random)" 
-            } else { 
-                Join-Path (Get-Location) "temp/EmptyTestDir_$(Get-Random)" 
-            }
-            New-Item -ItemType Directory -Path $EmptyDir -Force | Out-Null
+            $EmptyDir = New-TestTempDirectory -Prefix "EmptyTestDir"
             Push-Location $EmptyDir
             try {
                 $result = Get-NextSemanticVersion -BranchName "main" -TargetBranch "main"
@@ -285,18 +281,7 @@ Describe "Version Mismatch Handling" {
     
     Context "First Release Scenarios" {
         It "Should handle first release with standard version" {
-            $manifestPath = if ($env:TEMP) { 
-                Join-Path $env:TEMP "TestModule_Standard.psd1" 
-            } elseif ($env:TMPDIR) { 
-                Join-Path $env:TMPDIR "TestModule_Standard.psd1" 
-            } else { 
-                Join-Path (Get-Location) "temp/TestModule_Standard.psd1" 
-            }
-            # Ensure parent directory exists
-            $parentDir = Split-Path -Parent $manifestPath
-            if (-not (Test-Path $parentDir)) {
-                New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
-            }
+            $manifestPath = New-TestTempFile -Prefix "TestModule_Standard"
             "@{ ModuleVersion = '1.0.0' }" | Out-File -FilePath $manifestPath -Encoding UTF8 -Force
             
             try {
@@ -311,18 +296,7 @@ Describe "Version Mismatch Handling" {
         }
         
         It "Should handle first release with unusual version requiring force" {
-            $manifestPath = if ($env:TEMP) { 
-                Join-Path $env:TEMP "TestModule_Unusual.psd1" 
-            } elseif ($env:TMPDIR) { 
-                Join-Path $env:TMPDIR "TestModule_Unusual.psd1" 
-            } else { 
-                Join-Path (Get-Location) "temp/TestModule_Unusual.psd1" 
-            }
-            # Ensure parent directory exists
-            $parentDir = Split-Path -Parent $manifestPath
-            if (-not (Test-Path $parentDir)) {
-                New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
-            }
+            $manifestPath = New-TestTempFile -Prefix "TestModule_Unusual"
             "@{ ModuleVersion = '3.5.2' }" | Out-File -FilePath $manifestPath -Encoding UTF8 -Force
             
             try {
@@ -342,14 +316,7 @@ Describe "Version Mismatch Handling" {
     
     Context "Manifest Discovery" {
         It "Should autodiscover manifest if ManifestPath is empty" {
-            $tempDir = if ($env:TEMP) { 
-                Join-Path $env:TEMP "TestAutoDiscover_$(Get-Random)" 
-            } elseif ($env:TMPDIR) { 
-                Join-Path $env:TMPDIR "TestAutoDiscover_$(Get-Random)" 
-            } else { 
-                Join-Path (Get-Location) "temp/TestAutoDiscover_$(Get-Random)" 
-            }
-            New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+            $tempDir = New-TestTempDirectory -Prefix "TestAutoDiscover"
             $manifestPath = Join-Path $tempDir "TestModule.psd1"
             "@{ ModuleVersion = '1.0.0' }" | Out-File -FilePath $manifestPath -Encoding UTF8 -Force
             
@@ -365,14 +332,7 @@ Describe "Version Mismatch Handling" {
         }
         
         It "Should error if no manifest exists in repo" {
-            $emptyDir = if ($env:TEMP) { 
-                Join-Path $env:TEMP "EmptyTestDir_$(Get-Random)" 
-            } elseif ($env:TMPDIR) { 
-                Join-Path $env:TMPDIR "EmptyTestDir_$(Get-Random)" 
-            } else { 
-                Join-Path (Get-Location) "temp/EmptyTestDir_$(Get-Random)" 
-            }
-            New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
+            $emptyDir = New-TestTempDirectory -Prefix "EmptyTestDir"
             
             try {
                 Push-Location $emptyDir
