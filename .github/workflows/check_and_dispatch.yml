@@ -1,0 +1,63 @@
+name: 🚀 Smart Powershell Module Release Pipeline - SemanticVersioning
+
+# 🎯 Triggers: Push to master branch (e.g., PR merge)
+# 📋 Required Repository Variables:
+# - UBUNTU_VERSION: Ubuntu runner version (e.g., "ubuntu-22.04")
+# 📋 Required Repository Secrets:  
+# - REPO_DISPATCH_TOKEN: Personal Access Token for cross-repo dispatch
+
+on:
+  push:
+    branches: [ master, main ]
+
+env:
+  # 🌍 Global environment variables for consistency
+  RELEASE_AUTHOR: "github-actions[bot]"
+  RELEASE_EMAIL: "github-actions[bot]@users.noreply.github.com"
+
+jobs:
+  validate:
+    name: 🔐 Security & 🧪 Tests
+    runs-on: ${{ vars.UBUNTU_VERSION }}
+    outputs:
+      tests-passed: ${{ steps.tests.outputs.passed }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🛡️ Security scan
+        uses: github/super-linter/slim@v5
+        env:
+          DEFAULT_BRANCH: master
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_ALL_CODEBASE: false
+          VALIDATE_POWERSHELL: true
+
+      - name: 🧪 Run Pester tests
+        id: tests
+        shell: pwsh
+        run: |
+            Install-Module Pester -Force -Scope CurrentUser
+            Invoke-Pester -Path './Tests' -Output Detailed
+            echo "passed=true" >> $env:GITHUB_OUTPUT
+
+  dispatch:
+    name: 🚀 Trigger Auto-Publish Pipeline
+    runs-on: ubuntu-latest
+    needs: validate
+    if: needs.validate.outputs.tests-passed == 'true'
+    steps:
+      - name: 📤 Dispatch to auto-publish workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: GrexyLoco/K.PSGallery.AutoPublish
+          event-type: publish-module
+          client-payload: |
+            {
+              "module": "K.PSGallery.SemanticVersioning",
+              "repository": "${{ github.repository }}",
+              "ref": "${{ github.ref }}"
+            }
