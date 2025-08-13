@@ -18,7 +18,7 @@ env:
 jobs:
   validate:
     name: 🔐 Security & 🧪 Tests
-    runs-on: ${{ vars.UBUNTU_VERSION }}
+    runs-on: ubuntu-22.04
     outputs:
       tests-passed: ${{ steps.tests.outputs.passed }}
     steps:
@@ -40,6 +40,7 @@ jobs:
         shell: pwsh
         run: |
             Install-Module Pester -Force -Scope CurrentUser
+            Install-Module K.PSGallery.LoggingModule -Force -Scope CurrentUser
             Invoke-Pester -Path './Tests' -Output Detailed
             echo "passed=true" >> $env:GITHUB_OUTPUT
 
