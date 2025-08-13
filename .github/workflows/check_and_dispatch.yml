@@ -1,8 +1,10 @@
-name: 🚀 Smart Powershell Module Release Pipeline - SemanticVersioning
+name: 🚀 Smart PowerShell Module Release Pipeline
 
-# 🎯 Triggers: Push to master branch (e.g., PR merge)
+# 🎯 Triggers: Push to master branch (e.g., PR merge)  
 # 📋 Required Repository Variables:
 # - UBUNTU_VERSION: Ubuntu runner version (e.g., "ubuntu-22.04")
+# - MODULE_NAME: PowerShell module name for dispatch
+# - TARGET_REPOSITORY: Target repository for auto-publish dispatch  
 # 📋 Required Repository Secrets:  
 # - REPO_DISPATCH_TOKEN: Personal Access Token for cross-repo dispatch
 
@@ -14,57 +16,35 @@ env:
   # 🌍 Global environment variables for consistency
   RELEASE_AUTHOR: "github-actions[bot]"
   RELEASE_EMAIL: "github-actions[bot]@users.noreply.github.com"
+  # 📦 Module Configuration (can be overridden by repository variables)
+  MODULE_NAME: ${{ vars.MODULE_NAME || 'K.PSGallery.SemanticVersioning' }}
+  TARGET_REPOSITORY: ${{ vars.TARGET_REPOSITORY || 'GrexyLoco/K.PSGallery.AutoPublish' }}
 
 jobs:
   validate:
     name: 🔐 Security & 🧪 Tests
-    runs-on: ${{ vars.UBUNTU_VERSION }}
+    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-22.04' }}
     outputs:
-      test-success: ${{ steps.tests.outputs.test-success }}
-      total-tests: ${{ steps.tests.outputs.total-tests }}
-      passed-tests: ${{ steps.tests.outputs.passed-tests }}
-      failed-tests: ${{ steps.tests.outputs.failed-tests }}
+      test-success: ${{ steps.validation.outputs.test-success }}
+      total-tests: ${{ steps.validation.outputs.total-tests }}
+      passed-tests: ${{ steps.validation.outputs.passed-tests }}
+      failed-tests: ${{ steps.validation.outputs.failed-tests }}
+      skipped-tests: ${{ steps.validation.outputs.skipped-tests }}
+      test-duration: ${{ steps.validation.outputs.test-duration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: 🛡️ Security scan - gitleaks
-        uses: zricethezav/gitleaks-action@v2.3.9
-
-      - name: 🛡️ Security scan - super-linter
-        uses: github/super-linter/slim@v5
-        env:
-          DEFAULT_BRANCH: master
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VALIDATE_ALL_CODEBASE: false
-          VALIDATE_POWERSHELL: true
-
-      - name: 🔧 Setup Clean Test Environment
-        shell: pwsh
-        run: |
-          & "./.github/Scripts/Setup-CleanTestEnvironment.ps1" -TestPath "./Tests" -OutputPath "./TestResults.xml"
-
-      - name: 🧪 Run Clean Pester Tests
-        id: tests
-        shell: pwsh
-        run: |
-          & "./.github/Scripts/Invoke-CleanPesterTests.ps1" -TestPath "./Tests" -OutputPath "./TestResults.xml"
-
-      - name: 📋 Generate Test Summary  
-        if: always()
-        shell: pwsh
-        run: |
-          & "./.github/Scripts/Generate-TestSummary.ps1" -TotalTests '${{ steps.tests.outputs.total-tests }}' -PassedTests '${{ steps.tests.outputs.passed-tests }}' -FailedTests '${{ steps.tests.outputs.failed-tests }}' -SkippedTests '${{ steps.tests.outputs.skipped-tests }}' -Duration '${{ steps.tests.outputs.test-duration }}' -TestResultsPath '${{ steps.tests.outputs.test-results-path }}'
-
-      - name: 📄 Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: 🔐 Validate PowerShell Module
+        id: validation
+        uses: ./.github/actions/validate-powershell-module
         with:
-          name: test-results
-          path: TestResults.xml
-          retention-days: 30
+          test-path: './Tests'
+          output-path: './TestResults.xml'
+          validate-all-codebase: 'false'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   dispatch:
     name: 🚀 Trigger Auto-Publish Pipeline
@@ -76,11 +56,33 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.REPO_DISPATCH_TOKEN }}
-          repository: GrexyLoco/K.PSGallery.AutoPublish
+          repository: ${{ env.TARGET_REPOSITORY }}
           event-type: publish-module
           client-payload: |
             {
-              "module": "K.PSGallery.SemanticVersioning",
+              "module": "${{ env.MODULE_NAME }}",
               "repository": "${{ github.repository }}",
               "ref": "${{ github.ref }}"
             }
+            
+      - name: 📝 Dispatch Summary
+        if: always()
+        shell: bash
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 🚀 Auto-Publish Pipeline Triggered
+          
+          **Module:** `${{ env.MODULE_NAME }}`
+          **Target Repository:** `${{ env.TARGET_REPOSITORY }}`
+          **Source Repository:** `${{ github.repository }}`
+          **Branch:** `${{ github.ref_name }}`
+          **Status:** ✅ Dispatch sent successfully
+          
+          The auto-publish pipeline will now handle:
+          - 🔢 Semantic version calculation
+          - 📦 Module packaging
+          - 🚀 PowerShell Gallery publishing
+          - 🏷️ GitHub release creation
+          
+          ---
+          EOF

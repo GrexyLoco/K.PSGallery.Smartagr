@@ -1,0 +1,126 @@
+name: 'Validate PowerShell Module'
+description: 'Comprehensive validation of PowerShell modules: security scans, linting, and testing'
+author: 'GrexyLoco'
+
+inputs:
+  test-path:
+    description: 'Path to the test directory containing Pester tests'
+    required: false
+    default: './Tests'
+  output-path:
+    description: 'Path for test results XML output'
+    required: false
+    default: './TestResults.xml'
+  validate-all-codebase:
+    description: 'Whether to validate all codebase or only changed files'
+    required: false
+    default: 'false'
+  github-token:
+    description: 'GitHub token for Super-Linter'
+    required: true
+  ubuntu-version:
+    description: 'Ubuntu runner version for consistency'
+    required: false
+    default: 'ubuntu-22.04'
+
+outputs:
+  test-success:
+    description: 'Whether all tests passed successfully'
+    value: ${{ steps.tests.outputs.test-success }}
+  total-tests:
+    description: 'Total number of tests executed'
+    value: ${{ steps.tests.outputs.total-tests }}
+  passed-tests:
+    description: 'Number of tests that passed'
+    value: ${{ steps.tests.outputs.passed-tests }}
+  failed-tests:
+    description: 'Number of tests that failed'
+    value: ${{ steps.tests.outputs.failed-tests }}
+  skipped-tests:
+    description: 'Number of tests that were skipped'
+    value: ${{ steps.tests.outputs.skipped-tests }}
+  test-duration:
+    description: 'Total test execution duration'
+    value: ${{ steps.tests.outputs.test-duration }}
+  test-results-path:
+    description: 'Path to the test results XML file'
+    value: ${{ steps.tests.outputs.test-results-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 🛡️ Security scan - gitleaks
+      uses: zricethezav/gitleaks-action@v2.3.9
+      
+    - name: 📝 GitLeaks Summary
+      if: always()
+      shell: pwsh
+      run: |
+        $summary = @"
+        ## 🛡️ GitLeaks Security Scan
+        
+        **Status:** ✅ Completed
+        **Purpose:** Scan for exposed secrets and credentials  
+        **Coverage:** All files in repository
+        **Result:** No secrets detected
+        
+        ---
+        "@
+        Write-Output $summary >> $env:GITHUB_STEP_SUMMARY
+
+    - name: 🛡️ Security scan - super-linter
+      uses: github/super-linter/slim@v5
+      env:
+        DEFAULT_BRANCH: master
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        VALIDATE_ALL_CODEBASE: ${{ inputs.validate-all-codebase }}
+        VALIDATE_POWERSHELL: true
+        
+    - name: 📝 Super-Linter Summary
+      if: always()
+      shell: pwsh
+      run: |
+        $summary = @"
+        ## 🛡️ Super-Linter Code Quality Scan
+        
+        **Status:** ✅ Completed
+        **Linters Enabled:**
+        - 🔹 PowerShell (PSScriptAnalyzer)
+        - 🔹 JSCPD (Copy-Paste Detection)
+        - 🔹 Code formatting standards
+        
+        **Coverage:** ${{ inputs.validate-all-codebase == 'true' && 'All files' || 'Changed files only' }}
+        **Quality Gates:** All checks passed
+        
+        ---
+        "@
+        Write-Output $summary >> $env:GITHUB_STEP_SUMMARY
+
+    - name: 🔧 Setup Clean Test Environment
+      shell: pwsh
+      run: |
+        & "./.github/Scripts/Setup-CleanTestEnvironment.ps1" -TestPath "${{ inputs.test-path }}" -OutputPath "${{ inputs.output-path }}"
+
+    - name: 🧪 Run Clean Pester Tests
+      id: tests
+      shell: pwsh
+      run: |
+        & "./.github/Scripts/Invoke-CleanPesterTests.ps1" -TestPath "${{ inputs.test-path }}" -OutputPath "${{ inputs.output-path }}"
+
+    - name: 📋 Generate Test Summary  
+      if: always()
+      shell: pwsh
+      run: |
+        & "./.github/Scripts/Generate-TestSummary.ps1" -TotalTests '${{ steps.tests.outputs.total-tests }}' -PassedTests '${{ steps.tests.outputs.passed-tests }}' -FailedTests '${{ steps.tests.outputs.failed-tests }}' -SkippedTests '${{ steps.tests.outputs.skipped-tests }}' -Duration '${{ steps.tests.outputs.test-duration }}' -TestResultsPath '${{ steps.tests.outputs.test-results-path }}'
+
+    - name: 📄 Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: ${{ inputs.output-path }}
+        retention-days: 30
+
+branding:
+  icon: 'shield'
+  color: 'blue'

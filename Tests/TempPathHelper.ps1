@@ -1,5 +1,4 @@
-# TempPathHelper.ps1 - Simple helper function to avoid code duplication
-# This creates a standardized temp path helper that can be dot-sourced in tests
+# TempPathHelper.ps1 - Cross-platform temp path utilities for tests
 
 function script:Get-TestTempPath {
     param([string]$Suffix = "$(Get-Random)")
@@ -14,9 +13,7 @@ function script:Get-TestTempPath {
 }
 
 function script:New-TestTempDirectory {
-    param(
-        [string]$Prefix = "TempDir"
-    )
+    param([string]$Prefix = "TempDir")
     
     $tempPath = Get-TestTempPath -Suffix "${Prefix}_$(Get-Random)"
     $parentDir = Split-Path $tempPath -Parent
