@@ -2,14 +2,18 @@
 
 Describe "K.PSGallery.SemanticVersioning Basic Tests" {
     
-    BeforeEach {
+    BeforeAll {
+        # Ensure clean module state at start
+        Get-Module K.PSGallery.SemanticVersioning | Remove-Module -Force -ErrorAction SilentlyContinue
+        
         # Import the module
         $ModuleRoot = Split-Path $PSScriptRoot -Parent
         $ModulePath = Join-Path $ModuleRoot "K.PSGallery.SemanticVersioning.psd1"
         
-        Get-Module K.PSGallery.SemanticVersioning | Remove-Module -Force -ErrorAction SilentlyContinue
         Import-Module $ModulePath -Force
-        
+    }
+
+    BeforeEach {
         # Create test manifest
         $TestManifestPath = Join-Path $PSScriptRoot "TestModule.psd1"
         if (-not (Test-Path $TestManifestPath)) {
@@ -30,6 +34,11 @@ Describe "K.PSGallery.SemanticVersioning Basic Tests" {
         if (Test-Path $TestManifestPath) {
             Remove-Item $TestManifestPath -Force -ErrorAction SilentlyContinue
         }
+    }
+
+    AfterAll {
+        # Clean up module completely
+        Get-Module K.PSGallery.SemanticVersioning | Remove-Module -Force -ErrorAction SilentlyContinue
     }
     
     Context "Module Loading" {

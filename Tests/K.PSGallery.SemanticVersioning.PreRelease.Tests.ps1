@@ -1,7 +1,10 @@
 BeforeAll {
+    # Ensure clean module state
+    Get-Module K.PSGallery.SemanticVersioning | Remove-Module -Force -ErrorAction SilentlyContinue
+    
     # Import module with full path to avoid conflicts
     $ModulePath = Join-Path $PSScriptRoot ".." "K.PSGallery.SemanticVersioning.psd1"
-    Import-Module $ModulePath -Force -Global
+    Import-Module $ModulePath -Force
     
     # Mock logging functions to prevent output during tests
     function Write-SafeInfoLog { param($Message, $Context) }
@@ -9,22 +12,16 @@ BeforeAll {
     function Write-SafeErrorLog { param($Message, $Context) }
     function Write-SafeWarningLog { param($Message, $Context) }
     function Write-SafeTaskSuccessLog { param($Message, $Context) }
-    
-    # Create test manifest for consistent testing
-    $TestManifestPath = Join-Path $TestDrive "TestModule.psd1"
-    @"
-@{
-    ModuleVersion = '1.0.0'
-    GUID = '12345678-1234-1234-1234-123456789012'
-    Author = 'Test Author'
-    Description = 'Test Module for Pre-Release Testing'
-}
-"@ | Set-Content -Path $TestManifestPath
 }
 
 AfterAll {
-    # Clean up module
-    Remove-Module K.PSGallery.SemanticVersioning -Force -ErrorAction SilentlyContinue
+    # Clean up module completely
+    Get-Module K.PSGallery.SemanticVersioning | Remove-Module -Force -ErrorAction SilentlyContinue
+    
+    # Clear any cached module info
+    if (Get-Module K.PSGallery.SemanticVersioning -ListAvailable) {
+        Remove-Module K.PSGallery.SemanticVersioning -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Describe "Pre-Release Detection from Commit Messages" {

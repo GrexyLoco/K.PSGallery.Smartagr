@@ -55,7 +55,14 @@ function Set-MismatchRecord {
         
         # In production: gh secret set $secretName --body $secretValue
         # For testing: use temp file
-        $tempPath = Join-Path $env:TEMP "mismatch-records"
+        $tempPath = if ($env:TEMP) { 
+            Join-Path $env:TEMP "mismatch-records" 
+        } elseif ($env:TMPDIR) { 
+            Join-Path $env:TMPDIR "mismatch-records" 
+        } else { 
+            Join-Path (Get-Location) "temp/mismatch-records" 
+        }
+        
         if (-not (Test-Path $tempPath)) {
             New-Item -ItemType Directory -Path $tempPath -Force | Out-Null
         }
@@ -116,7 +123,13 @@ function Test-RecentMismatch {
         Write-SafeInfoLog -Message "Validating recent mismatch for version: $Version"
         
         # Get all mismatch records (in production: gh secret list | grep VERSION_MISMATCH)
-        $tempPath = Join-Path $env:TEMP "mismatch-records"
+        $tempPath = if ($env:TEMP) { 
+            Join-Path $env:TEMP "mismatch-records" 
+        } elseif ($env:TMPDIR) { 
+            Join-Path $env:TMPDIR "mismatch-records" 
+        } else { 
+            Join-Path (Get-Location) "temp/mismatch-records" 
+        }
         if (-not (Test-Path $tempPath)) {
             return @{
                 IsValid = $false
@@ -263,7 +276,13 @@ function Set-ForceSemanticVersion {
         
         # Cleanup the mismatch record (it's been used)
         try {
-            $tempPath = Join-Path $env:TEMP "mismatch-records"
+            $tempPath = if ($env:TEMP) { 
+                Join-Path $env:TEMP "mismatch-records" 
+            } elseif ($env:TMPDIR) { 
+                Join-Path $env:TMPDIR "mismatch-records" 
+            } else { 
+                Join-Path (Get-Location) "temp/mismatch-records" 
+            }
             $usedRecords = $validation.Records
             foreach ($record in $usedRecords) {
                 $secretName = "VERSION_MISMATCH_$($record.RecordId.Replace('-', ''))"
@@ -439,7 +458,13 @@ If this was not intentional:
 
     # In GitHub Actions, this would be written to $GITHUB_STEP_SUMMARY
     # For testing, we'll write to a temp file
-    $summaryFile = Join-Path $env:TEMP "github-step-summary.md"
+    $summaryFile = if ($env:TEMP) { 
+        Join-Path $env:TEMP "github-step-summary.md" 
+    } elseif ($env:TMPDIR) { 
+        Join-Path $env:TMPDIR "github-step-summary.md" 
+    } else { 
+        Join-Path (Get-Location) "temp/github-step-summary.md" 
+    }
     $summary | Set-Content -Path $summaryFile -Encoding UTF8
     
     Write-SafeTaskSuccessLog -Message "GitHub Actions summary updated with mismatch notification"

@@ -27,7 +27,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 🛡️ Security scan
+      - name: 🛡️ Security scan - gitleaks
+        uses: zricethezav/gitleaks-action@v2.3.9
+
+      - name: 🛡️ Security scan - super-linter
         uses: github/super-linter/slim@v5
         env:
           DEFAULT_BRANCH: master

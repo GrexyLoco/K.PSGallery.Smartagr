@@ -2,7 +2,10 @@
 
 Describe "K.PSGallery.SemanticVersioning Module Tests" {
     
-    BeforeEach {
+    BeforeAll {
+        # Ensure clean module state at start
+        Get-Module K.PSGallery.SemanticVersioning | Remove-Module -Force -ErrorAction SilentlyContinue
+        
         # Import the module under test using absolute path
         $ModuleRoot = Split-Path $PSScriptRoot -Parent
         $ModulePath = Join-Path $ModuleRoot "K.PSGallery.SemanticVersioning.psd1"
@@ -11,10 +14,10 @@ Describe "K.PSGallery.SemanticVersioning Module Tests" {
             throw "Module manifest not found at: $ModulePath"
         }
         
-        # Remove any existing module and import fresh
-        Get-Module K.PSGallery.SemanticVersioning | Remove-Module -Force -ErrorAction SilentlyContinue
         Import-Module $ModulePath -Force
-        
+    }
+
+    BeforeEach {
         # Create test manifest for testing
         $TestManifestPath = Join-Path $PSScriptRoot "TestModule.psd1"
         $TestManifestContent = @"
@@ -31,7 +34,6 @@ Describe "K.PSGallery.SemanticVersioning Module Tests" {
 
     AfterEach {
         # Clean up test manifests
-
         $TestManifestPath = Join-Path $PSScriptRoot "TestModule.psd1"
         $InvalidManifestPath = Join-Path $PSScriptRoot "InvalidTestModule.psd1"
         
@@ -40,6 +42,11 @@ Describe "K.PSGallery.SemanticVersioning Module Tests" {
                 Remove-Item $_ -Force -ErrorAction SilentlyContinue
             }
         }
+    }
+
+    AfterAll {
+        # Clean up module completely
+        Get-Module K.PSGallery.SemanticVersioning | Remove-Module -Force -ErrorAction SilentlyContinue
     }
     
     Context "Module Loading" {
@@ -101,7 +108,13 @@ Describe "K.PSGallery.SemanticVersioning Module Tests" {
         
         It "Should handle missing manifest path gracefully" {
             # Test in directory without .psd1 files
-            $EmptyDir = Join-Path $env:TEMP "EmptyTestDir_$(Get-Random)"
+            $EmptyDir = if ($env:TEMP) { 
+                Join-Path $env:TEMP "EmptyTestDir_$(Get-Random)" 
+            } elseif ($env:TMPDIR) { 
+                Join-Path $env:TMPDIR "EmptyTestDir_$(Get-Random)" 
+            } else { 
+                Join-Path (Get-Location) "temp/EmptyTestDir_$(Get-Random)" 
+            }
             New-Item -ItemType Directory -Path $EmptyDir -Force | Out-Null
             Push-Location $EmptyDir
             try {
@@ -224,6 +237,16 @@ Describe "Semantic Versioning Logic Tests" {
 
 Describe "GitHub Actions Integration" {
     
+    BeforeAll {
+        # Ensure module is available for this test context
+        $ModuleRoot = Split-Path $PSScriptRoot -Parent
+        $ModulePath = Join-Path $ModuleRoot "K.PSGallery.SemanticVersioning.psd1"
+        
+        if (-not (Get-Module K.PSGallery.SemanticVersioning)) {
+            Import-Module $ModulePath -Force
+        }
+    }
+    
     Context "Output Structure" {
         
         It "Should provide all outputs required by GitHub Actions" {
@@ -262,7 +285,18 @@ Describe "Version Mismatch Handling" {
     
     Context "First Release Scenarios" {
         It "Should handle first release with standard version" {
-            $manifestPath = Join-Path $env:TEMP "TestModule_Standard.psd1"
+            $manifestPath = if ($env:TEMP) { 
+                Join-Path $env:TEMP "TestModule_Standard.psd1" 
+            } elseif ($env:TMPDIR) { 
+                Join-Path $env:TMPDIR "TestModule_Standard.psd1" 
+            } else { 
+                Join-Path (Get-Location) "temp/TestModule_Standard.psd1" 
+            }
+            # Ensure parent directory exists
+            $parentDir = Split-Path -Parent $manifestPath
+            if (-not (Test-Path $parentDir)) {
+                New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+            }
             "@{ ModuleVersion = '1.0.0' }" | Out-File -FilePath $manifestPath -Encoding UTF8 -Force
             
             try {
@@ -277,7 +311,18 @@ Describe "Version Mismatch Handling" {
         }
         
         It "Should handle first release with unusual version requiring force" {
-            $manifestPath = Join-Path $env:TEMP "TestModule_Unusual.psd1"
+            $manifestPath = if ($env:TEMP) { 
+                Join-Path $env:TEMP "TestModule_Unusual.psd1" 
+            } elseif ($env:TMPDIR) { 
+                Join-Path $env:TMPDIR "TestModule_Unusual.psd1" 
+            } else { 
+                Join-Path (Get-Location) "temp/TestModule_Unusual.psd1" 
+            }
+            # Ensure parent directory exists
+            $parentDir = Split-Path -Parent $manifestPath
+            if (-not (Test-Path $parentDir)) {
+                New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+            }
             "@{ ModuleVersion = '3.5.2' }" | Out-File -FilePath $manifestPath -Encoding UTF8 -Force
             
             try {
@@ -297,7 +342,13 @@ Describe "Version Mismatch Handling" {
     
     Context "Manifest Discovery" {
         It "Should autodiscover manifest if ManifestPath is empty" {
-            $tempDir = Join-Path $env:TEMP "TestAutoDiscover_$(Get-Random)"
+            $tempDir = if ($env:TEMP) { 
+                Join-Path $env:TEMP "TestAutoDiscover_$(Get-Random)" 
+            } elseif ($env:TMPDIR) { 
+                Join-Path $env:TMPDIR "TestAutoDiscover_$(Get-Random)" 
+            } else { 
+                Join-Path (Get-Location) "temp/TestAutoDiscover_$(Get-Random)" 
+            }
             New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
             $manifestPath = Join-Path $tempDir "TestModule.psd1"
             "@{ ModuleVersion = '1.0.0' }" | Out-File -FilePath $manifestPath -Encoding UTF8 -Force
@@ -314,7 +365,13 @@ Describe "Version Mismatch Handling" {
         }
         
         It "Should error if no manifest exists in repo" {
-            $emptyDir = Join-Path $env:TEMP "EmptyTestDir_$(Get-Random)"
+            $emptyDir = if ($env:TEMP) { 
+                Join-Path $env:TEMP "EmptyTestDir_$(Get-Random)" 
+            } elseif ($env:TMPDIR) { 
+                Join-Path $env:TMPDIR "EmptyTestDir_$(Get-Random)" 
+            } else { 
+                Join-Path (Get-Location) "temp/EmptyTestDir_$(Get-Random)" 
+            }
             New-Item -ItemType Directory -Path $emptyDir -Force | Out-Null
             
             try {
