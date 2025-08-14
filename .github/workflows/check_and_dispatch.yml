@@ -39,12 +39,13 @@ jobs:
 
       - name: 🔐 Validate PowerShell Module
         id: validation
-        uses: ./.github/actions/validate-powershell-module
+        uses: GrexyLoco/K.Actions.PSModuleValidation@v1.0.0
         with:
           test-path: './Tests'
           output-path: './TestResults.xml'
           validate-all-codebase: 'false'
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          module-name: ${{ env.MODULE_NAME }}
 
   dispatch:
     name: 🚀 Trigger Auto-Publish Pipeline
