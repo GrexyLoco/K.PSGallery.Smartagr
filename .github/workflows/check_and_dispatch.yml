@@ -39,7 +39,7 @@ jobs:
 
       - name: 🔐 Validate PowerShell Module
         id: validation
-        uses: GrexyLoco/K.Actions.PSModuleValidation@v1.0.0
+        uses: GrexyLoco/K.Actions.PSModuleValidation@v1.0.1
         with:
           test-path: './Tests'
           output-path: './TestResults.xml'
