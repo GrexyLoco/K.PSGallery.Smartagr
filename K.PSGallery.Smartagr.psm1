@@ -705,8 +705,8 @@ function Get-LatestSemanticTag {
 #endregion
 
 #region Module Export Control
-# Export only the public functions defined in the manifest
-Export-ModuleMember -Function 'New-SemanticReleaseTags', 'Get-SemanticVersionTags', 'Get-LatestSemanticTag', 'New-GitHubRelease'
+# Export public functions - removed New-GitHubRelease as it's out of scope for Smartagr
+Export-ModuleMember -Function 'New-SemanticReleaseTags', 'Get-SemanticVersionTags', 'Get-LatestSemanticTag', 'Move-SmartTags'
 #endregion
 
 #region Module Cleanup
