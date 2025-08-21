@@ -1,15 +1,15 @@
 @{
     # Script module or binary module file associated with this manifest.
-    RootModule = 'K.PSGallery.SemanticVersioning.psm1'
+    RootModule = 'K.PSGallery.Smartagr.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0.1'
+    ModuleVersion = '0.1.0'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Desktop', 'Core')
 
     # ID used to uniquely identify this module
-    GUID = 'a1b2c3d4-e5f6-7890-1234-567890abcdef'
+    GUID = 'c9a7d1e5-4f2b-4c8a-9e6d-3b7f8c4a2e1d'
 
     # Author of this module
     Author = 'K.PSGallery'
@@ -21,34 +21,37 @@
     Copyright = '(c) 2025 K.PSGallery. All rights reserved.'
 
     # Description of the functionality provided by this module
-    Description = 'Semantic Versioning module for PowerShell projects with Git-based release analysis, branch pattern detection, and first release hybrid logic.'
+    Description = 'Smart Git Tag Management with Semantic Versioning Intelligence. Automatically creates and manages Git tags with sophisticated version progression logic, smart tag intelligence, and moving tag management.'
 
     # Minimum version of the PowerShell engine required by this module
-    PowerShellVersion = '5.1'
+    PowerShellVersion = '7.0'
 
     # Modules that must be imported into the global environment prior to importing this module
-    RequiredModules = @(
-        @{
-            ModuleName = 'K.PSGallery.LoggingModule'
-            ModuleVersion = '1.1.46'
-        }
-    )
+    RequiredModules = @()
+
+    # Assemblies that must be loaded prior to importing this module
+    RequiredAssemblies = @()
+
+    # Script files (.ps1) that are run in the caller's environment prior to importing this module.
+    ScriptsToProcess = @()
+
+    # Type files (.ps1xml) to be loaded when importing this module
+    TypesToProcess = @()
+
+    # Format files (.ps1xml) to be loaded when importing this module
+    FormatsToProcess = @()
+
+    # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
+    NestedModules = @()
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-    FunctionsToExport = @(
-        'Get-NextSemanticVersion',
-        'Get-FirstSemanticVersion',
-        'Set-MismatchRecord',
-        'Test-RecentMismatch',
-        'Set-ForceSemanticVersion',
-        'Send-MismatchNotification'
-    )
+    FunctionsToExport = @('New-SemanticReleaseTags', 'Get-SemanticVersionTags', 'Get-LatestSemanticTag')
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
     CmdletsToExport = @()
 
     # Variables to export from this module
-    VariablesToExport = @()
+    VariablesToExport = '*'
 
     # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
     AliasesToExport = @()
@@ -57,28 +60,27 @@
     PrivateData = @{
         PSData = @{
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags = @('SemanticVersioning', 'SemVer', 'Git', 'Release', 'Versioning', 'PowerShell', 'CI', 'CD', 'GitHub', 'Actions')
+            Tags = @('Git', 'Tags', 'SemanticVersioning', 'Versioning', 'Release', 'Automation', 'SmartTags', 'PowerShell')
 
             # A URL to the license for this module.
-            LicenseUri = 'https://github.com/GrexyLoco/K.Actions.NextVersion/blob/main/LICENSE'
+            LicenseUri = 'https://github.com/GrexyLoco/K.PSGallery.Smartagr/blob/main/LICENSE'
 
             # A URL to the main website for this project.
-            ProjectUri = 'https://github.com/GrexyLoco/K.Actions.NextVersion'
+            ProjectUri = 'https://github.com/GrexyLoco/K.PSGallery.Smartagr'
 
             # A URL to an icon representing this module.
             # IconUri = ''
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
-## Version 1.0.0
-- Initial release of K.PSGallery.SemanticVersioning module
-- Git-based semantic version analysis
-- Branch pattern detection (feature/, bugfix/, major/, etc.)
-- Commit message keyword analysis (BREAKING, MAJOR, FEATURE, etc.)
-- Hybrid first release logic with PSD1 validation
-- Structured error handling for unusual first release versions
-- Support for Alpha/Beta versioning suffixes
-- Compatible with GitHub Actions and local development
+## Version 0.1.0
+- Initial release of K.PSGallery.Smartagr
+- Smart Git tag management with semantic versioning
+- Automatic smart tag creation and moving tag intelligence
+- Support for major, minor, and patch version progression
+- Pre-release version handling with alpha/beta/rc support
+- PowerShell 7.0+ optimized with comprehensive parameter validation
+- Integration with K.PSGallery.LoggingModule for structured logging
 '@
 
             # Prerelease string of this module
@@ -93,7 +95,7 @@
     }
 
     # HelpInfo URI of this module
-    # HelpInfoURI = ''
+    HelpInfoURI = 'https://github.com/GrexyLoco/K.PSGallery.Smartagr/blob/main/README.md'
 
     # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
     # DefaultCommandPrefix = ''
