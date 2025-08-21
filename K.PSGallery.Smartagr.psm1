@@ -704,11 +704,6 @@ function Get-LatestSemanticTag {
 
 #endregion
 
-#region Module Export Control
-# Export public functions - removed New-GitHubRelease as it's out of scope for Smartagr
-Export-ModuleMember -Function 'New-SemanticReleaseTags', 'Get-SemanticVersionTags', 'Get-LatestSemanticTag', 'Move-SmartTags'
-#endregion
-
 #region Module Cleanup
-Write-SafeLog "INFO" "K.PSGallery.Smartagr module loaded successfully" "ExportedFunctions: New-SemanticReleaseTags, Get-SemanticVersionTags, Get-LatestSemanticTag, New-GitHubRelease"
+Write-SafeLog "INFO" "K.PSGallery.Smartagr module loaded successfully" "ExportedFunctions: New-SemanticReleaseTags, Get-SemanticVersionTags, Get-LatestSemanticTag, Move-SmartTags, New-SmartRelease, New-GitHubDraftRelease, Publish-GitHubRelease, Remove-GitHubRelease"
 #endregion
