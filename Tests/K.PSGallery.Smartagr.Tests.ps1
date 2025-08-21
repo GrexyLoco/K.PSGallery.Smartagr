@@ -72,7 +72,8 @@ Describe "K.PSGallery.Smartagr Module" -Tag "Unit" {
             $expectedFunctions = @(
                 'New-SemanticReleaseTags',
                 'Get-SemanticVersionTags', 
-                'Get-LatestSemanticTag'
+                'Get-LatestSemanticTag',
+                'New-GitHubRelease'
             ) | Sort-Object
             
             $exportedFunctions | Should -Be $expectedFunctions
@@ -140,6 +141,24 @@ Describe "K.PSGallery.Smartagr Module" -Tag "Unit" {
             foreach ($version in $invalidVersions) {
                 { New-SemanticReleaseTags -TargetVersion $version -WhatIf } | Should -Throw -Because "Version '$version' should be invalid"
             }
+        }
+    }
+    
+    Context "GitHub Release Function Availability" {
+        It "Should have New-GitHubRelease function available" {
+            Get-Command New-GitHubRelease -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+        }
+        
+        It "Should validate GitHub Release parameters correctly" {
+            $command = Get-Command New-GitHubRelease
+            $command.Parameters.Keys | Should -Contain "Version"
+            $command.Parameters.Keys | Should -Contain "CreateTags"
+            $command.Parameters.Keys | Should -Contain "Draft"
+            $command.Parameters.Keys | Should -Contain "Prerelease"
+        }
+        
+        It "Should reject invalid versions for GitHub Release" {
+            { New-GitHubRelease -Version "invalid-version" -WhatIf } | Should -Throw -Because "Invalid version should be rejected"
         }
     }
 }

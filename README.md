@@ -137,6 +137,45 @@ v2.1.0     2.1.0      False        {v2.1, v2, latest}
 - `RepositoryPath`: Path to Git repository
 - `IncludePreRelease`: Include pre-release versions in search
 
+### `New-GitHubRelease`
+Creates GitHub Releases with automatic tag creation and smart release notes.
+
+```powershell
+# Create release with smart tags
+New-GitHubRelease -Version "v1.2.0" -CreateTags -PushTags
+
+# Create draft pre-release
+New-GitHubRelease -Version "v2.0.0-alpha.1" -Draft -CreateTags
+
+# Create release with custom notes
+New-GitHubRelease -Version "v1.5.0" -ReleaseNotesFile "CHANGELOG.md" -CreateTags
+```
+
+**Example Output:**
+```
+Creating GitHub release v1.2.0 with smart tags
+✓ Created tag: v1.2.0
+✓ Created smart tag: v1.2 (pointing to v1.2.0)
+✓ Created smart tag: v1 (pointing to v1.2.0)
+✓ Updated smart tag: latest (pointing to v1.2.0)
+✅ GitHub Release created: v1.2.0
+🔗 Release URL: https://github.com/owner/repo/releases/tag/v1.2.0
+```
+
+**Parameters:**
+- `Version`: Semantic version for the release
+- `CreateTags`: Also create smart tags with New-SemanticReleaseTags
+- `PushTags`: Push created tags to remote repository
+- `Draft`: Create as draft release
+- `Prerelease`: Mark as prerelease (auto-detected from version)
+- `ReleaseNotes`: Custom release notes text
+- `ReleaseNotesFile`: Path to file containing release notes
+- `GenerateNotes`: Use GitHub's automatic release notes generation
+
+**Requirements:**
+- GitHub CLI (`gh`) installed and authenticated
+- Repository must be hosted on GitHub
+
 ## 🔧 Advanced Configuration
 
 ### Smart Tag Customization

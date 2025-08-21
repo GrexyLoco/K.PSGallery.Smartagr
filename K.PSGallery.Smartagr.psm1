@@ -706,9 +706,9 @@ function Get-LatestSemanticTag {
 
 #region Module Export Control
 # Export only the public functions defined in the manifest
-Export-ModuleMember -Function 'New-SemanticReleaseTags', 'Get-SemanticVersionTags', 'Get-LatestSemanticTag'
+Export-ModuleMember -Function 'New-SemanticReleaseTags', 'Get-SemanticVersionTags', 'Get-LatestSemanticTag', 'New-GitHubRelease'
 #endregion
 
 #region Module Cleanup
-Write-SafeLog "INFO" "K.PSGallery.Smartagr module loaded successfully" "ExportedFunctions: New-SemanticReleaseTags, Get-SemanticVersionTags, Get-LatestSemanticTag"
+Write-SafeLog "INFO" "K.PSGallery.Smartagr module loaded successfully" "ExportedFunctions: New-SemanticReleaseTags, Get-SemanticVersionTags, Get-LatestSemanticTag, New-GitHubRelease"
 #endregion
