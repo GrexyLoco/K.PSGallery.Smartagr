@@ -73,7 +73,7 @@ Describe "K.PSGallery.Smartagr Module" -Tag "Unit" {
                 'New-SemanticReleaseTags',
                 'Get-SemanticVersionTags', 
                 'Get-LatestSemanticTag',
-                'New-GitHubRelease'
+                'New-SmartRelease'
             ) | Sort-Object
             
             $exportedFunctions | Should -Be $expectedFunctions
@@ -144,21 +144,21 @@ Describe "K.PSGallery.Smartagr Module" -Tag "Unit" {
         }
     }
     
-    Context "GitHub Release Function Availability" {
-        It "Should have New-GitHubRelease function available" {
-            Get-Command New-GitHubRelease -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+    Context "Smart Release Function Availability" {
+        It "Should have New-SmartRelease function available" {
+            Get-Command New-SmartRelease -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
         }
         
-        It "Should validate GitHub Release parameters correctly" {
-            $command = Get-Command New-GitHubRelease
-            $command.Parameters.Keys | Should -Contain "Version"
-            $command.Parameters.Keys | Should -Contain "CreateTags"
-            $command.Parameters.Keys | Should -Contain "Draft"
-            $command.Parameters.Keys | Should -Contain "Prerelease"
+        It "Should validate Smart Release parameters correctly" {
+            $command = Get-Command New-SmartRelease
+            $command.Parameters.Keys | Should -Contain "TargetVersion"
+            $command.Parameters.Keys | Should -Contain "RepositoryPath"
+            $command.Parameters.Keys | Should -Contain "Force"
+            $command.Parameters.Keys | Should -Contain "PushToRemote"
         }
         
-        It "Should reject invalid versions for GitHub Release" {
-            { New-GitHubRelease -Version "invalid-version" -WhatIf } | Should -Throw -Because "Invalid version should be rejected"
+        It "Should reject invalid versions for Smart Release" {
+            { New-SmartRelease -TargetVersion "invalid-version" -WhatIf } | Should -Throw -Because "Invalid version should be rejected"
         }
     }
 }

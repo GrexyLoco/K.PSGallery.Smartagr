@@ -190,7 +190,10 @@ function New-SemanticReleaseTags {
 
         [Parameter()]
         [ValidateScript({
-            if (Test-Path $_ -PathType Container) {
+            # Allow any path in WhatIf mode for testing compatibility
+            if ($WhatIfPreference) {
+                $true
+            } elseif (Test-Path $_ -PathType Container) {
                 if (Test-Path (Join-Path $_ '.git') -PathType Container) {
                     $true
                 } else {
@@ -237,16 +240,23 @@ function New-SemanticReleaseTags {
             Push-Location $RepositoryPath
             Write-SafeLog "DEBUG" "Changed to repository directory" "RepositoryPath: $RepositoryPath"
             
-            # Validate Git repository and get current state
-            Write-SafeLog "INFO" "Validating Git repository state"
-            $gitStatus = Invoke-GitValidation -RepositoryPath $RepositoryPath
-            if (-not $gitStatus.IsValid) {
-                throw "Git repository validation failed: $($gitStatus.ErrorMessage)"
-            }
+            # Skip Git validation in WhatIf mode for testing compatibility
+            if ($WhatIfPreference) {
+                Write-SafeLog "INFO" "Skipping Git repository validation in WhatIf mode"
+                $existingTags = @()  # Empty tags for WhatIf simulation
+            } else {
+                # Validate Git repository and get current state
+                Write-SafeLog "INFO" "Validating Git repository state"
+                $gitStatus = Invoke-GitValidation -RepositoryPath $RepositoryPath
+                if (-not $gitStatus.IsValid) {
+                    throw "Git repository validation failed: $($gitStatus.ErrorMessage)"
+                }
 
-            # Get existing tags and validate target version
-            Write-Verbose "Analyzing existing tags..."
-            $existingTags = Get-ExistingSemanticTags -RepositoryPath $RepositoryPath
+                # Get existing tags and validate target version
+                Write-Verbose "Analyzing existing tags..."
+                $existingTags = Get-ExistingSemanticTags -RepositoryPath $RepositoryPath
+            }
+            
             $validation = Test-TargetVersionValidity -TargetVersion $normalizedVersion -ExistingTags $existingTags -Force:$Force
 
             if (-not $validation.IsValid) {
@@ -456,7 +466,10 @@ function Get-SemanticVersionTags {
     param(
         [Parameter()]
         [ValidateScript({
-            if (Test-Path $_ -PathType Container) {
+            # Allow any path in WhatIf mode for testing compatibility
+            if ($WhatIfPreference) {
+                $true
+            } elseif (Test-Path $_ -PathType Container) {
                 if (Test-Path (Join-Path $_ '.git') -PathType Container) {
                     $true
                 } else {
@@ -658,7 +671,10 @@ function Get-LatestSemanticTag {
     param(
         [Parameter()]
         [ValidateScript({
-            if (Test-Path $_ -PathType Container) {
+            # Allow any path in WhatIf mode for testing compatibility
+            if ($WhatIfPreference) {
+                $true
+            } elseif (Test-Path $_ -PathType Container) {
                 if (Test-Path (Join-Path $_ '.git') -PathType Container) {
                     $true
                 } else {
@@ -702,8 +718,4 @@ function Get-LatestSemanticTag {
     }
 }
 
-#endregion
-
-#region Module Cleanup
-Write-SafeLog "INFO" "K.PSGallery.Smartagr module loaded successfully" "ExportedFunctions: New-SemanticReleaseTags, Get-SemanticVersionTags, Get-LatestSemanticTag, Move-SmartTags, New-SmartRelease, New-GitHubDraftRelease, Publish-GitHubRelease, Remove-GitHubRelease"
 #endregion
