@@ -38,61 +38,61 @@ function Invoke-GitValidation {
     
     try {
         Push-Location $RepositoryPath
-        Write-InfoLog "Starting Git repository validation" -Context "RepositoryPath: $RepositoryPath"
+        Write-SafeInfoLog "Starting Git repository validation" -Context "RepositoryPath: $RepositoryPath"
         
         # Check if git command is available
         git --version 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) {
             $errorMsg = "Git CLI is not available in PATH. Please install Git."
-            Write-ErrorLog $errorMsg
+            Write-SafeErrorLog $errorMsg
             $result.ErrorMessage = $errorMsg
             return $result
         }
         
-        Write-DebugLog "Git CLI is available"
+        Write-SafeDebugLog "Git CLI is available"
         
         # Check if we're in a Git repository
         git rev-parse --git-dir 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) {
             $errorMsg = "Directory is not a Git repository."
-            Write-ErrorLog $errorMsg -Context "Path: $RepositoryPath"
+            Write-SafeErrorLog $errorMsg -Context "Path: $RepositoryPath"
             $result.ErrorMessage = $errorMsg
             return $result
         }
         
-        Write-DebugLog "Git repository structure validated"
+        Write-SafeDebugLog "Git repository structure validated"
         
         # Check if there's at least one commit
         git rev-parse HEAD 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) {
             $errorMsg = "Repository has no commits. At least one commit is required."
-            Write-ErrorLog $errorMsg
+            Write-SafeErrorLog $errorMsg
             $result.ErrorMessage = $errorMsg
             return $result
         }
         
-        Write-DebugLog "Repository has commits available"
+        Write-SafeDebugLog "Repository has commits available"
         
         # Check working directory status if required
         if ($RequireCleanWorkingDirectory) {
             $status = git status --porcelain 2>$null
             if ($status) {
                 $errorMsg = "Working directory has uncommitted changes. Commit or stash changes before creating tags."
-                Write-WarningLog $errorMsg -Context "UncommittedFiles: $($status -join ', ')"
+                Write-SafeWarningLog $errorMsg -Context "UncommittedFiles: $($status -join ', ')"
                 $result.ErrorMessage = $errorMsg
                 return $result
             }
-            Write-DebugLog "Working directory is clean"
+            Write-SafeDebugLog "Working directory is clean"
         }
         
         $result.IsValid = $true
-        Write-InfoLog "Git repository validation completed successfully"
+        Write-SafeInfoLog "Git repository validation completed successfully"
         return $result
         
     }
     catch {
         $errorMsg = "Git validation failed: $($_.Exception.Message)"
-        Write-ErrorLog $errorMsg -Context "RepositoryPath: $RepositoryPath"
+        Write-SafeErrorLog $errorMsg -Context "RepositoryPath: $RepositoryPath"
         $result.ErrorMessage = $errorMsg
         return $result
     }
@@ -124,38 +124,38 @@ function Get-ExistingSemanticTags {
     
     try {
         Push-Location $RepositoryPath
-        Write-InfoLog "Retrieving existing semantic version tags" -Context "RepositoryPath: $RepositoryPath"
+        Write-SafeInfoLog "Retrieving existing semantic version tags" -Context "RepositoryPath: $RepositoryPath"
         
         $allTags = git tag -l 2>$null
         if ($LASTEXITCODE -ne 0 -or -not $allTags) {
-            Write-InfoLog "No tags found in repository"
+            Write-SafeInfoLog "No tags found in repository"
             return @()
         }
         
-        Write-DebugLog "Retrieved all tags from repository" -Context "TotalTagCount: $($allTags.Count)"
+        Write-SafeDebugLog "Retrieved all tags from repository" -Context "TotalTagCount: $($allTags.Count)"
         
         $semanticPattern = '^v?\d+\.\d+\.\d+(-[a-zA-Z0-9\-\.]+)?(\+[a-zA-Z0-9\-\.]+)?$'
         $semanticTags = $allTags | Where-Object { $_ -match $semanticPattern }
         
-        Write-InfoLog "Filtered semantic version tags" -Context "SemanticTagCount: $($semanticTags.Count)`nTotalTagCount: $($allTags.Count)"
+        Write-SafeInfoLog "Filtered semantic version tags" -Context "SemanticTagCount: $($semanticTags.Count)`nTotalTagCount: $($allTags.Count)"
         
         $tagObjects = foreach ($tag in $semanticTags) {
             $parsed = ConvertTo-SemanticVersionObject -TagName $tag
             if ($parsed) {
-                Write-DebugLog "Successfully parsed semantic tag" -Context "Tag: $tag`nVersion: $($parsed.Version)"
+                Write-SafeDebugLog "Successfully parsed semantic tag" -Context "Tag: $tag`nVersion: $($parsed.Version)"
                 $parsed
             }
         }
         
         $sortedTags = $tagObjects | Sort-Object { $_.Version } -Descending
-        Write-InfoLog "Semantic tags retrieved and sorted successfully" -Context "FinalCount: $($sortedTags.Count)"
+        Write-SafeInfoLog "Semantic tags retrieved and sorted successfully" -Context "FinalCount: $($sortedTags.Count)"
         
         return $sortedTags
         
     }
     catch {
         $errorMsg = "Failed to get existing semantic tags: $($_.Exception.Message)"
-        Write-ErrorLog $errorMsg -Context "RepositoryPath: $RepositoryPath"
+        Write-SafeErrorLog $errorMsg -Context "RepositoryPath: $RepositoryPath"
         return @()
     }
     finally {
@@ -434,4 +434,84 @@ function Get-GitTagDetails {
     finally {
         Pop-Location
     }
+}
+
+<#
+.SYNOPSIS
+    Retrieves all tags from the repository that follow semantic versioning.
+
+.DESCRIPTION
+    This function fetches all tags from the specified Git repository, then filters them to return only those
+    that conform to semantic versioning standards (e.g., v1.2.3, 2.0.0-alpha).
+
+.PARAMETER RepositoryPath
+    The path to the Git repository. Defaults to the current directory.
+
+.EXAMPLE
+    Get-SemanticVersionTags
+    Returns all semantic version tags from the current repository.
+
+.OUTPUTS
+    [string[]] An array of tags that are valid semantic versions.
+#>
+function Get-SemanticVersionTags {
+    param(
+        [string]$RepositoryPath = (Get-Location).Path
+    )
+    
+    Write-SafeDebugLog -Message "Getting all semantic version tags" -Additional @{ "RepositoryPath" = $RepositoryPath }
+    
+    $allTags = Get-GitTags -RepositoryPath $RepositoryPath
+    
+    $semanticTags = $allTags | ForEach-Object {
+        if (Test-IsValidSemanticVersion -Version $_) {
+            $_
+        }
+    }
+    
+    Write-SafeInfoLog -Message "Found $($semanticTags.Count) semantic version tags" -Additional @{ "TotalTags" = $allTags.Count }
+    
+    return $semanticTags
+}
+
+<#
+.SYNOPSIS
+    Finds the latest (highest) semantic version tag in the repository.
+
+.DESCRIPTION
+    This function retrieves all semantic version tags and sorts them to find the highest, most recent version.
+    It correctly handles pre-release and final versions to determine the latest tag.
+
+.PARAMETER RepositoryPath
+    The path to the Git repository. Defaults to the current directory.
+
+.EXAMPLE
+    Get-LatestSemanticTag
+    Returns the latest semantic version tag (e.g., "v1.5.2").
+
+.OUTPUTS
+    [string] The latest semantic version tag found.
+#>
+function Get-LatestSemanticTag {
+    param(
+        [string]$RepositoryPath = (Get-Location).Path
+    )
+    
+    Write-SafeDebugLog -Message "Getting the latest semantic tag" -Additional @{ "RepositoryPath" = $RepositoryPath }
+    
+    $semanticTags = Get-SemanticVersionTags -RepositoryPath $RepositoryPath
+    
+    if ($null -eq $semanticTags -or $semanticTags.Count -eq 0) {
+        Write-SafeWarningLog -Message "No semantic version tags found in the repository."
+        return $null
+    }
+    
+    # Sort tags using semantic version comparison logic
+    $sortedTags = $semanticTags | Sort-Object -Property @{ Expression = { [System.Version]($_.TrimStart('v')) } } -Descending
+    
+    $latestTag = $sortedTags[0]
+    
+    Write-SafeInfoLog -Message "Latest semantic tag found" -Additional @{ "LatestTag" = $latestTag }
+    
+    return $latestTag
 }

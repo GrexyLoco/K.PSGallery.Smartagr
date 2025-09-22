@@ -28,7 +28,7 @@ function ConvertTo-SemanticVersionObject {
     )
     
     try {
-        Write-DebugLog "Parsing semantic version tag" -Context "TagName: $TagName"
+        Write-SafeDebugLog "Parsing semantic version tag" -Context "TagName: $TagName"
         
         # Extract version string (remove 'v' prefix if present)
         $versionString = if ($TagName.StartsWith('v')) {
@@ -37,7 +37,7 @@ function ConvertTo-SemanticVersionObject {
             $TagName
         }
         
-        Write-DebugLog "Extracted version string" -Context "Original: $TagName`nVersionString: $versionString"
+        Write-SafeDebugLog "Extracted version string" -Context "Original: $TagName`nVersionString: $versionString"
         
         # Parse using PowerShell's semantic version class
         $semVer = [System.Management.Automation.SemanticVersion]::new($versionString)
@@ -66,14 +66,14 @@ function ConvertTo-SemanticVersionObject {
             BuildLabel = $semVer.BuildLabel
         }
         
-        Write-DebugLog "Successfully parsed semantic version" -Context "Tag: $TagName`nMajor: $($semVer.Major)`nMinor: $($semVer.Minor)`nPatch: $($semVer.Patch)`nIsPreRelease: $isPreRelease"
+        Write-SafeDebugLog "Successfully parsed semantic version" -Context "Tag: $TagName`nMajor: $($semVer.Major)`nMinor: $($semVer.Minor)`nPatch: $($semVer.Patch)`nIsPreRelease: $isPreRelease"
         
         return $parsedVersion
         
     }
     catch {
         $warningMsg = "Failed to parse semantic version from tag '$TagName': $($_.Exception.Message)"
-        Write-WarningLog $warningMsg
+        Write-SafeWarningLog $warningMsg
         return $null
     }
 }
@@ -121,18 +121,18 @@ function Test-TargetVersionValidity {
     }
     
     try {
-        Write-InfoLog "Starting target version validation" -Context "TargetVersion: $TargetVersion`nExistingTagCount: $($ExistingTags.Count)`nForce: $Force"
+        Write-SafeInfoLog "Starting target version validation" -Context "TargetVersion: $TargetVersion`nExistingTagCount: $($ExistingTags.Count)`nForce: $Force"
         
         # Parse target version
         $targetObj = ConvertTo-SemanticVersionObject -TagName $TargetVersion
         if (-not $targetObj) {
             $errorMsg = "Target version '$TargetVersion' is not a valid semantic version."
-            Write-ErrorLog $errorMsg
+            Write-SafeErrorLog $errorMsg
             $result.ErrorMessage = $errorMsg
             return $result
         }
         
-        Write-DebugLog "Target version parsed successfully" -Context "ParsedVersion: $($targetObj.Version)"
+        Write-SafeDebugLog "Target version parsed successfully" -Context "ParsedVersion: $($targetObj.Version)"
         
         # Check if version already exists
         $existingTag = $ExistingTags | Where-Object { $_.Tag -eq $TargetVersion }
