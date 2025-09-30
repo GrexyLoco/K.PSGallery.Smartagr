@@ -11,6 +11,15 @@ name: 🚀 Smart PowerShell Module Release Pipeline
 on:
   push:
     branches: [ master, main ]
+  workflow_dispatch:
+    # Optional manual trigger for testing
+    inputs:
+      test:
+        description: 'Run validation only (no dispatch)'
+        required: false
+        default: false
+        type: boolean
+
 
 env:
   # 🌍 Global environment variables for consistency

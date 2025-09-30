@@ -14,7 +14,7 @@ BeforeAll {
     # Import the module for testing - this loads all functions including private ones
     Import-Module $script:ModulePath -Force -ErrorAction Stop
     
-    # Import private functions directly from source files for testing
+    # Import private functions directly from source files for testing 
     $srcPath = Join-Path $PSScriptRoot '..' 'src'
     if (Test-Path $srcPath) {
         Get-ChildItem -Path $srcPath -Filter '*.ps1' -Recurse | ForEach-Object {
