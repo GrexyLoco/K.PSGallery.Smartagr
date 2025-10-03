@@ -150,10 +150,7 @@ function New-SemanticReleaseTags {
         [string]$RepositoryPath = (Get-Location).Path,
         
         [Parameter()]
-        [switch]$Force,
-        
-        [Parameter()]
-        [switch]$WhatIf
+        [switch]$Force
     )
     
     try {
@@ -161,8 +158,14 @@ function New-SemanticReleaseTags {
             "TargetVersion" = $TargetVersion
         }
         
+        # Strict validation: Only allow standard semantic versions with alpha, beta, rc pre-release labels
+        $strictPattern = '^v?\d+\.\d+\.\d+(-(?:alpha|beta|rc)(?:\.\d+)?)?(\+.+)?$'
+        if ($TargetVersion -notmatch $strictPattern) {
+            throw "Invalid semantic version format: '$TargetVersion'. Only standard versions (e.g., v1.2.3) and pre-release versions with 'alpha', 'beta', or 'rc' labels are allowed (e.g., v1.2.3-alpha.1, v2.0.0-beta, v1.5.0-rc.2)."
+        }
+        
         # Normalize version format (ensure v prefix)
-        $normalizedVersion = ConvertTo-NormalizedVersion -Version $TargetVersion
+        $normalizedVersion = if ($TargetVersion.StartsWith('v')) { $TargetVersion } else { "v$TargetVersion" }
         Write-SafeDebugLog -Message "Version normalized" -Additional @{
             "Original" = $TargetVersion
             "Normalized" = $normalizedVersion
@@ -243,6 +246,12 @@ function New-SemanticReleaseTags {
             "StackTrace" = $_.ScriptStackTrace
         }
         
+        # For validation errors (ArgumentException), rethrow to allow proper error handling
+        if ($_.Exception -is [System.ArgumentException] -or $_.Exception.Message -match "Invalid semantic version format") {
+            throw
+        }
+        
+        # For operational errors, return structured result
         return @{
             Success = $false
             Strategy = $null
@@ -319,10 +328,7 @@ function New-SmartRelease {
         [string]$PreReleaseLabel,
         
         [Parameter()]
-        [switch]$Force,
-        
-        [Parameter()]
-        [switch]$WhatIf
+        [switch]$Force
     )
     
     try {
