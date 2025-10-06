@@ -74,7 +74,7 @@ jobs:
               "bump_type": "${{ needs.release.outputs.bump-type }}",
               "triggered_by": "${{ github.actor }}",
               "source_url": "https://github.com/${{ github.repository }}",
-              "gallery_url": "https://www.powershellgallery.com/packages/K.PSGallery.LoggingModule/${{ needs.release.outputs.new-version }}"
+              "gallery_url": "https://www.powershellgallery.com/packages/K.PSGallery.Smartagr/${{ needs.release.outputs.new-version }}"
             }
 
       - name: 📝 Dispatch Summary
