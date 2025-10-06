@@ -1,32 +1,31 @@
 name: 🚀 Smart PowerShell Module Release Pipeline
 
-# 🎯 Triggers: Push to master branch (e.g., PR merge)  
+# 🎯 Triggers: Push to master branch (e.g., PR merge)
 # 📋 Required Repository Variables:
 # - UBUNTU_VERSION: Ubuntu runner version (e.g., "ubuntu-22.04")
 # - MODULE_NAME: PowerShell module name for dispatch
-# - TARGET_REPOSITORY: Target repository for auto-publish dispatch  
-# 📋 Required Repository Secrets:  
+# - TARGET_REPOSITORY: Target repository for auto-publish dispatch
+# 📋 Required Repository Secrets:
 # - REPO_DISPATCH_TOKEN: Personal Access Token for cross-repo dispatch
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
   workflow_dispatch:
     # Optional manual trigger for testing
     inputs:
       test:
-        description: 'Run validation only (no dispatch)'
+        description: "Run validation only (no dispatch)"
         required: false
         default: false
         type: boolean
-
 
 env:
   # 🌍 Global environment variables for consistency
   RELEASE_AUTHOR: "github-actions[bot]"
   RELEASE_EMAIL: "github-actions[bot]@users.noreply.github.com"
   # 📦 Module Configuration (can be overridden by repository variables)
-  MODULE_NAME: ${{ vars.MODULE_NAME || 'K.PSGallery.SemanticVersioning' }}
+  MODULE_NAME: ${{ vars.MODULE_NAME || 'K.PSGallery.SmartAgr' }}
   TARGET_REPOSITORY: ${{ vars.TARGET_REPOSITORY || 'GrexyLoco/K.PSGallery.AutoPublish' }}
 
 jobs:
@@ -50,9 +49,9 @@ jobs:
         id: validation
         uses: GrexyLoco/K.Actions.PSModuleValidation@v1.0.1
         with:
-          test-path: './Tests'
-          output-path: './TestResults.xml'
-          validate-all-codebase: 'false'
+          test-path: "./Tests"
+          output-path: "./TestResults.xml"
+          validate-all-codebase: "false"
           github-token: ${{ secrets.GITHUB_TOKEN }}
           module-name: ${{ env.MODULE_NAME }}
 
@@ -66,33 +65,36 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.REPO_DISPATCH_TOKEN }}
-          repository: ${{ env.TARGET_REPOSITORY }}
+          repository: grexyloco/K.PSGallery
           event-type: publish-module
           client-payload: |
             {
-              "module": "${{ env.MODULE_NAME }}",
-              "repository": "${{ github.repository }}",
-              "ref": "${{ github.ref }}"
+              "repo": "${{ github.repository }}",
+              "tag": "v${{ needs.release.outputs.new-version }}",
+              "bump_type": "${{ needs.release.outputs.bump-type }}",
+              "triggered_by": "${{ github.actor }}",
+              "source_url": "https://github.com/${{ github.repository }}",
+              "gallery_url": "https://www.powershellgallery.com/packages/K.PSGallery.LoggingModule/${{ needs.release.outputs.new-version }}"
             }
-            
+
       - name: 📝 Dispatch Summary
         if: always()
         shell: bash
         run: |
           cat >> $GITHUB_STEP_SUMMARY << 'EOF'
           ## 🚀 Auto-Publish Pipeline Triggered
-          
+
           **Module:** `${{ env.MODULE_NAME }}`
           **Target Repository:** `${{ env.TARGET_REPOSITORY }}`
           **Source Repository:** `${{ github.repository }}`
           **Branch:** `${{ github.ref_name }}`
           **Status:** ✅ Dispatch sent successfully
-          
+
           The auto-publish pipeline will now handle:
           - 🔢 Semantic version calculation
           - 📦 Module packaging
           - 🚀 PowerShell Gallery publishing
           - 🏷️ GitHub release creation
-          
+
           ---
           EOF
