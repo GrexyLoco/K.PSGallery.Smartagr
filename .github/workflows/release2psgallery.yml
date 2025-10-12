@@ -29,8 +29,8 @@ env:
   TARGET_REPOSITORY: ${{ vars.TARGET_REPOSITORY || 'GrexyLoco/K.PSGallery' }}
 
 jobs:
-  validate:
-    name: 🔐 Security & 🧪 Tests
+  quality-gate:
+    name: 🔐 Quality Gate
     runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-22.04' }}
     outputs:
       test-success: ${{ steps.validation.outputs.test-success }}
@@ -55,26 +55,75 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           module-name: ${{ env.MODULE_NAME }}
 
-  dispatch:
-    name: 🚀 Trigger Auto-Publish Pipeline
+  version-and-tag:
+    name: 📦 Version & Tag
     runs-on: ubuntu-latest
-    needs: validate
-    if: needs.validate.outputs.test-success == 'true'
+    needs: quality-gate
+    if: needs.quality-gate.outputs.test-success == 'true'
+    outputs:
+      new-version: ${{ steps.version.outputs.newVersion }}
+      current-version: ${{ steps.version.outputs.currentVersion }}
+      bump-type: ${{ steps.version.outputs.bumpType }}
+      last-release-tag: ${{ steps.version.outputs.lastReleaseTag }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔢 Calculate next version
+        id: version
+        uses: GrexyLoco/K.Actions.NextVersion@v1
+        with:
+          manifestPath: './K.PSGallery.Smartagr.psd1'
+          branchName: ${{ github.ref_name }}
+          targetBranch: 'master'
+
+      - name: 🏷️ Create Git Tag
+        if: steps.version.outputs.newVersion != ''
+        run: |
+          git config user.name "${{ env.RELEASE_AUTHOR }}"
+          git config user.email "${{ env.RELEASE_EMAIL }}"
+          git tag -a "v${{ steps.version.outputs.newVersion }}" -m "Release v${{ steps.version.outputs.newVersion }}"
+          git push origin "v${{ steps.version.outputs.newVersion }}"
+
+      - name: 📝 Release Summary
+        if: always()
+        shell: bash
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 📦 Version Calculation
+
+          **Current Version:** `${{ steps.version.outputs.currentVersion }}`
+          **New Version:** `${{ steps.version.outputs.newVersion }}`
+          **Bump Type:** `${{ steps.version.outputs.bumpType }}`
+          **Last Release Tag:** `${{ steps.version.outputs.lastReleaseTag }}`
+
+          ---
+          EOF
+
+  trigger-publish:
+    name: 🚀 Trigger Publish via Repo Dispatch (K.PSGallery)
+    runs-on: ubuntu-latest
+    needs: [quality-gate, version-and-tag]
+    if: needs.quality-gate.outputs.test-success == 'true' && needs.version-and-tag.outputs.new-version != ''
     steps:
       - name: 📤 Dispatch to auto-publish workflow
         uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ secrets.REPO_DISPATCH_TOKEN }}
-          repository: grexyloco/K.PSGallery
+          repository: ${{ env.TARGET_REPOSITORY }}
           event-type: publish-module
           client-payload: |
             {
               "repo": "${{ github.repository }}",
-              "tag": "v${{ needs.release.outputs.new-version }}",
-              "bump_type": "${{ needs.release.outputs.bump-type }}",
+              "tag": "v${{ needs.version-and-tag.outputs.new-version }}",
+              "bump_type": "${{ needs.version-and-tag.outputs.bump-type }}",
               "triggered_by": "${{ github.actor }}",
               "source_url": "https://github.com/${{ github.repository }}",
-              "gallery_url": "https://www.powershellgallery.com/packages/K.PSGallery.Smartagr/${{ needs.release.outputs.new-version }}"
+              "gallery_url": "https://www.powershellgallery.com/packages/${{ env.MODULE_NAME }}/${{ needs.version-and-tag.outputs.new-version }}"
             }
 
       - name: 📝 Dispatch Summary
