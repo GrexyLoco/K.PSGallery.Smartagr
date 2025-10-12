@@ -115,7 +115,7 @@ jobs:
         with:
           token: ${{ secrets.REPO_DISPATCH_TOKEN }}
           repository: ${{ env.TARGET_REPOSITORY }}
-          event-type: publish-module
+          event-type: publish_module
           client-payload: |
             {
               "repo": "${{ github.repository }}",
