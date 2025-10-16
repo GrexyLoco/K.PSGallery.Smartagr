@@ -81,13 +81,88 @@ jobs:
           branchName: ${{ github.ref_name }}
           targetBranch: 'master'
 
+      - name: 📝 Update Manifest Version
+        if: steps.version.outputs.newVersion != ''
+        shell: pwsh
+        run: |
+          $manifestPath = './K.PSGallery.Smartagr.psd1'
+          $newVersion = '${{ steps.version.outputs.newVersion }}'
+          
+          Write-Host "🔄 Updating manifest version to $newVersion..."
+          
+          # Read current manifest
+          $content = Get-Content $manifestPath -Raw
+          
+          # Update ModuleVersion with regex
+          $updatedContent = $content -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$newVersion'"
+          
+          # Verify the replacement worked
+          if ($updatedContent -notmatch "ModuleVersion\s*=\s*'$newVersion'") {
+            Write-Error "❌ MANIFEST UPDATE FAILED!"
+            Write-Error ""
+            Write-Error "⚠️  CRITICAL: Das Manifest konnte nicht aktualisiert werden."
+            Write-Error "    Dies führt zu einem Konflikt zwischen Git-Tags und Manifest-Version."
+            Write-Error ""
+            Write-Error "📋 Mögliche Ursachen:"
+            Write-Error "    • ModuleVersion-Format im Manifest ist ungültig"
+            Write-Error "    • Regex-Pattern konnte Version nicht finden"
+            Write-Error "    • Datei ist schreibgeschützt"
+            Write-Error ""
+            Write-Error "🔧 Manuelle Lösung erforderlich:"
+            Write-Error "    1. Prüfe K.PSGallery.Smartagr.psd1 auf korrekte ModuleVersion-Syntax"
+            Write-Error "    2. Aktualisiere ModuleVersion manuell auf '$newVersion'"
+            Write-Error "    3. Commit mit Message: 'chore: update manifest to $newVersion [skip ci]'"
+            Write-Error ""
+            exit 1
+          }
+          
+          # Write updated content back
+          Set-Content -Path $manifestPath -Value $updatedContent -NoNewline
+          
+          Write-Host "✅ Manifest successfully updated to version $newVersion"
+          
+          # Configure git
+          git config user.name "${{ env.RELEASE_AUTHOR }}"
+          git config user.email "${{ env.RELEASE_EMAIL }}"
+          
+          # Commit the updated manifest
+          git add $manifestPath
+          git commit -m "chore: update manifest to $newVersion [skip ci]"
+          git push origin ${{ github.ref_name }}
+          
+          Write-Host "✅ Manifest changes committed and pushed"
+
       - name: 🏷️ Create Git Tag
         if: steps.version.outputs.newVersion != ''
         run: |
           git config user.name "${{ env.RELEASE_AUTHOR }}"
           git config user.email "${{ env.RELEASE_EMAIL }}"
+          
+          # Check if tag already exists
+          if git rev-parse "v${{ steps.version.outputs.newVersion }}" >/dev/null 2>&1; then
+            echo "❌ ERROR: Tag v${{ steps.version.outputs.newVersion }} already exists!"
+            echo ""
+            echo "⚠️  MANIFEST-TAG-KONFLIKT ERKANNT"
+            echo "    Das Tag v${{ steps.version.outputs.newVersion }} existiert bereits, aber das"
+            echo "    Manifest wurde nicht entsprechend aktualisiert."
+            echo ""
+            echo "📋 Mögliche Ursachen:"
+            echo "    • Vorheriger Workflow-Run hat Tag erstellt, aber Manifest-Update fehlgeschlagen"
+            echo "    • Manueller Tag-Push ohne Manifest-Update"
+            echo "    • Manifest wurde nach Tag-Erstellung zurückgesetzt"
+            echo ""
+            echo "🔧 Lösungsvorschläge:"
+            echo "    1. Lösche das existierende Tag: git push --delete origin v${{ steps.version.outputs.newVersion }}"
+            echo "    2. Oder: Aktualisiere Manifest manuell auf ${{ steps.version.outputs.newVersion }} und pushe mit [skip ci]"
+            echo "    3. Dann: Starte den Workflow erneut"
+            echo ""
+            exit 1
+          fi
+          
           git tag -a "v${{ steps.version.outputs.newVersion }}" -m "Release v${{ steps.version.outputs.newVersion }}"
           git push origin "v${{ steps.version.outputs.newVersion }}"
+          
+          echo "✅ Tag v${{ steps.version.outputs.newVersion }} successfully created"
 
       - name: 📝 Release Summary
         if: always()
