@@ -12,13 +12,13 @@
     GUID = 'c9a7d1e5-4f2b-4c8a-9e6d-3b7f8c4a2e1d'
 
     # Author of this module
-    Author = 'K.PSGallery'
+    Author = '1d70f'
 
     # Company or vendor of this module
-    CompanyName = 'K.PSGallery'
+    CompanyName = '1d70f'
 
     # Copyright statement for this module
-    Copyright = '(c) 2025 K.PSGallery. All rights reserved.'
+    Copyright = '(c) 2025 1d70f. All rights reserved.'
 
     # Description of the functionality provided by this module
     Description = 'Smart Git Tag Management with Semantic Versioning Intelligence. Automatically creates and manages Git tags with sophisticated version progression logic, smart tag intelligence, and moving tag management.'
