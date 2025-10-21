@@ -155,7 +155,6 @@ jobs:
             $result = New-SemanticReleaseTags `
               -TargetVersion $targetVersion `
               -RepositoryPath $repoPath `
-              -PushToRemote `
               -Verbose
             
             if ($result.Success) {
