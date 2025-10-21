@@ -134,103 +134,103 @@ jobs:
 
       # TEMPORARY: Simple tag creation to publish the improved version to PSGallery
       # TODO: Re-enable Smartagr tagging after this version is published
-      - name: 🏷️ Create Git Tag (Simple - Temporary)
+      # - name: 🏷️ Create Git Tag (Simple - Temporary)
+      #   if: steps.version.outputs.newVersion != ''
+      #   run: |
+      #     git config user.name "${{ env.RELEASE_AUTHOR }}"
+      #     git config user.email "${{ env.RELEASE_EMAIL }}"
+          
+      #     # Check if tag already exists
+      #     if git rev-parse "v${{ steps.version.outputs.newVersion }}" >/dev/null 2>&1; then
+      #       echo "⚠️ Tag v${{ steps.version.outputs.newVersion }} already exists - skipping"
+      #     else
+      #       git tag -a "v${{ steps.version.outputs.newVersion }}" -m "Release v${{ steps.version.outputs.newVersion }}"
+      #       git push origin "v${{ steps.version.outputs.newVersion }}"
+      #       echo "✅ Tag v${{ steps.version.outputs.newVersion }} successfully created"
+      #     fi
+
+      # DISABLED: Smartagr-based tagging (will be re-enabled after next publish)
+      - name: 🏷️ Create semantic release tags with Smartagr
         if: steps.version.outputs.newVersion != ''
+        shell: pwsh
         run: |
+          # � Configure Git for tagging
           git config user.name "${{ env.RELEASE_AUTHOR }}"
           git config user.email "${{ env.RELEASE_EMAIL }}"
           
-          # Check if tag already exists
-          if git rev-parse "v${{ steps.version.outputs.newVersion }}" >/dev/null 2>&1; then
-            echo "⚠️ Tag v${{ steps.version.outputs.newVersion }} already exists - skipping"
-          else
-            git tag -a "v${{ steps.version.outputs.newVersion }}" -m "Release v${{ steps.version.outputs.newVersion }}"
-            git push origin "v${{ steps.version.outputs.newVersion }}"
-            echo "✅ Tag v${{ steps.version.outputs.newVersion }} successfully created"
-          fi
-
-      # DISABLED: Smartagr-based tagging (will be re-enabled after next publish)
-      # - name: 🏷️ Create semantic release tags with Smartagr
-        # if: steps.version.outputs.newVersion != ''
-        # shell: pwsh
-        # run: |
-        #   # � Configure Git for tagging
-        #   git config user.name "${{ env.RELEASE_AUTHOR }}"
-        #   git config user.email "${{ env.RELEASE_EMAIL }}"
+          # �📦 Install K.PSGallery.Smartagr from PSGallery (latest stable)
+          Write-Host "📦 Installing K.PSGallery.Smartagr..."
+          Install-Module K.PSGallery.Smartagr -Force -Scope CurrentUser -AllowClobber
+          Import-Module K.PSGallery.Smartagr -Verbose
           
-        #   # �📦 Install K.PSGallery.Smartagr from PSGallery (latest stable)
-        #   Write-Host "📦 Installing K.PSGallery.Smartagr..."
-        #   Install-Module K.PSGallery.Smartagr -Force -Scope CurrentUser -AllowClobber
-        #   Import-Module K.PSGallery.Smartagr -Verbose
+          # 🏷️ Create semantic release tags (base + smart tags)
+          Write-Host "🏷️ Creating semantic release tags for v${{ steps.version.outputs.newVersion }}..."
           
-        #   # 🏷️ Create semantic release tags (base + smart tags)
-        #   Write-Host "🏷️ Creating semantic release tags for v${{ steps.version.outputs.newVersion }}..."
+          $targetVersion = "v${{ steps.version.outputs.newVersion }}"
+          $repoPath = "${{ github.workspace }}"
           
-        #   $targetVersion = "v${{ steps.version.outputs.newVersion }}"
-        #   $repoPath = "${{ github.workspace }}"
+          # Ensure errors are caught
+          $ErrorActionPreference = 'Stop'
           
-        #   # Ensure errors are caught
-        #   $ErrorActionPreference = 'Stop'
-          
-        #   try {
-        #     $result = New-SemanticReleaseTags `
-        #       -TargetVersion $targetVersion `
-        #       -RepositoryPath $repoPath `
-        #       -Verbose
+          try {
+            $result = New-SemanticReleaseTags `
+              -TargetVersion $targetVersion `
+              -RepositoryPath $repoPath `
+              -Verbose
             
-        #     if ($result.Success) {
-        #       Write-Host "✅ Semantic release tags created successfully"
-        #       Write-Host "   Target: $($result.TargetVersion)"
-        #       Write-Host "   All tags: $($result.AllTags -join ', ')"
+            if ($result.Success) {
+              Write-Host "✅ Semantic release tags created successfully"
+              Write-Host "   Target: $($result.TargetVersion)"
+              Write-Host "   All tags: $($result.AllTags -join ', ')"
               
-        #       # 📝 Add summary to GitHub Actions UI
-        #       @"
-        #   ## 🏷️ Semantic Tag Management (Smartagr)
+              # 📝 Add summary to GitHub Actions UI
+              @"
+          ## 🏷️ Semantic Tag Management (Smartagr)
           
-        #   **Target Version:** ``$($result.TargetVersion)``
-        #   **Bump Type:** ``${{ steps.version.outputs.bumpType }}``
+          **Target Version:** ``$($result.TargetVersion)``
+          **Bump Type:** ``${{ steps.version.outputs.bumpType }}``
           
-        #   ### ✅ Tags Created
-        #   - **Release Tag:** ``$($result.ReleaseTag)``
-        #   - **Smart Tags:** $($result.SmartTags | ForEach-Object { "``$_``" } | Join-String -Separator ', ')
-        #   - **Moving Tags:** $($result.MovingTags | ForEach-Object { "``$_``" } | Join-String -Separator ', ')
+          ### ✅ Tags Created
+          - **Release Tag:** ``$($result.ReleaseTag)``
+          - **Smart Tags:** $($result.SmartTags | ForEach-Object { "``$_``" } | Join-String -Separator ', ')
+          - **Moving Tags:** $($result.MovingTags | ForEach-Object { "``$_``" } | Join-String -Separator ', ')
           
-        #   ### 📊 Tag Strategy
-        #   - Smart tags automatically follow the latest release
-        #   - Moving tags always point to newest stable version
-        #   - Major/Minor tags enable flexible version pinning
+          ### 📊 Tag Strategy
+          - Smart tags automatically follow the latest release
+          - Moving tags always point to newest stable version
+          - Major/Minor tags enable flexible version pinning
           
-        #   ---
-        #   *Powered by [K.PSGallery.Smartagr](https://www.powershellgallery.com/packages/K.PSGallery.Smartagr)*
-        #   "@ >> $env:GITHUB_STEP_SUMMARY
+          ---
+          *Powered by [K.PSGallery.Smartagr](https://www.powershellgallery.com/packages/K.PSGallery.Smartagr)*
+          "@ >> $env:GITHUB_STEP_SUMMARY
               
-        #     } else {
-        #       Write-Error "❌ Semantic tag creation failed!"
-        #       Write-Error ""
-        #       Write-Error "Error Message: $($result.Error)"
-        #       Write-Error "Error Type: $($result.ErrorType)"
-        #       Write-Error ""
-        #       if ($result.StackTrace) {
-        #         Write-Error "Stack Trace:"
-        #         Write-Error "$($result.StackTrace)"
-        #         Write-Error ""
-        #       }
-        #       exit 1
-        #     }
-        #   }
-        #   catch {
-        #     Write-Error "❌ EXCEPTION during tag creation!"
-        #     Write-Error ""
-        #     Write-Error "Exception Type: $($_.Exception.GetType().FullName)"
-        #     Write-Error "Error Message: $($_.Exception.Message)"
-        #     Write-Error ""
-        #     if ($_.ScriptStackTrace) {
-        #       Write-Error "Stack Trace:"
-        #       Write-Error "$($_.ScriptStackTrace)"
-        #     }
-        #     Write-Error ""
-        #     exit 1
-        #   }
+            } else {
+              Write-Error "❌ Semantic tag creation failed!"
+              Write-Error ""
+              Write-Error "Error Message: $($result.Error)"
+              Write-Error "Error Type: $($result.ErrorType)"
+              Write-Error ""
+              if ($result.StackTrace) {
+                Write-Error "Stack Trace:"
+                Write-Error "$($result.StackTrace)"
+                Write-Error ""
+              }
+              exit 1
+            }
+          }
+          catch {
+            Write-Error "❌ EXCEPTION during tag creation!"
+            Write-Error ""
+            Write-Error "Exception Type: $($_.Exception.GetType().FullName)"
+            Write-Error "Error Message: $($_.Exception.Message)"
+            Write-Error ""
+            if ($_.ScriptStackTrace) {
+              Write-Error "Stack Trace:"
+              Write-Error "$($_.ScriptStackTrace)"
+            }
+            Write-Error ""
+            exit 1
+          }
 
       - name: 📝 Release Summary
         if: always()
