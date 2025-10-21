@@ -229,15 +229,25 @@ function New-SemanticReleaseTags {
                 
                 Write-SafeInfoLog -Message "Successfully created semantic release tags" -Additional @{
                     "ReleaseTag" = $strategy.ReleaseTag
-                    "SmartTagCount" = $strategy.SmartTags.Count
-                    "MovingTagCount" = $strategy.MovingTags.Count
+                    "SmartTagCount" = $strategy.SmartTagsToCreate.Count
+                    "MovingTagCount" = $strategy.MovingTagsToUpdate.Count
                 }
             }
             
+            # Collect all created/updated tags for result
+            $allTags = @()
+            $allTags += $strategy.ReleaseTag
+            $allTags += $strategy.SmartTagsToCreate.Name
+            $allTags += $strategy.MovingTagsToUpdate.Name
+            
             return @{
                 Success = $true
-                Strategy = $strategy
-                Message = "Semantic release tags processed successfully"
+                TargetVersion = $normalizedVersion
+                ReleaseTag = $strategy.ReleaseTag
+                SmartTags = $strategy.SmartTagsToCreate.Name
+                MovingTags = $strategy.MovingTagsToUpdate.Name
+                AllTags = $allTags
+                Message = "Semantic release tags created successfully"
             }
         }
         finally {
@@ -257,11 +267,18 @@ function New-SemanticReleaseTags {
             throw
         }
         
-        # For operational errors, return structured result
+        # For operational errors, return structured result with detailed error info
         return @{
             Success = $false
-            Strategy = $null
+            TargetVersion = $TargetVersion
+            ReleaseTag = $null
+            SmartTags = @()
+            MovingTags = @()
+            AllTags = @()
             Message = "Failed to create semantic release tags: $($_.Exception.Message)"
+            Error = $_.Exception.Message
+            ErrorType = $_.Exception.GetType().FullName
+            StackTrace = $_.ScriptStackTrace
         }
     }
 }

@@ -151,6 +151,9 @@ jobs:
           $targetVersion = "v${{ steps.version.outputs.newVersion }}"
           $repoPath = "${{ github.workspace }}"
           
+          # Ensure errors are caught
+          $ErrorActionPreference = 'Stop'
+          
           try {
             $result = New-SemanticReleaseTags `
               -TargetVersion $targetVersion `
@@ -159,37 +162,55 @@ jobs:
             
             if ($result.Success) {
               Write-Host "✅ Semantic release tags created successfully"
-              Write-Host "   Base tag: $targetVersion"
-              Write-Host "   Smart tags: $($result.SmartTags -join ', ')"
+              Write-Host "   Target: $($result.TargetVersion)"
+              Write-Host "   All tags: $($result.AllTags -join ', ')"
               
               # 📝 Add summary to GitHub Actions UI
               @"
           ## 🏷️ Semantic Tag Management (Smartagr)
           
-          **Target Version:** ``$targetVersion``
+          **Target Version:** ``$($result.TargetVersion)``
           **Bump Type:** ``${{ steps.version.outputs.bumpType }}``
           
           ### ✅ Tags Created
-          - **Base Tag:** ``$targetVersion``
+          - **Release Tag:** ``$($result.ReleaseTag)``
           - **Smart Tags:** $($result.SmartTags | ForEach-Object { "``$_``" } | Join-String -Separator ', ')
+          - **Moving Tags:** $($result.MovingTags | ForEach-Object { "``$_``" } | Join-String -Separator ', ')
           
           ### 📊 Tag Strategy
           - Smart tags automatically follow the latest release
-          - ``latest`` always points to newest stable version
-          - Major/Minor tags (e.g., ``v1``, ``v1.2``) enable flexible version pinning
+          - Moving tags always point to newest stable version
+          - Major/Minor tags enable flexible version pinning
           
           ---
           *Powered by [K.PSGallery.Smartagr](https://www.powershellgallery.com/packages/K.PSGallery.Smartagr)*
           "@ >> $env:GITHUB_STEP_SUMMARY
               
             } else {
-              Write-Error "❌ Semantic tag creation failed: $($result.Error)"
+              Write-Error "❌ Semantic tag creation failed!"
+              Write-Error ""
+              Write-Error "Error Message: $($result.Error)"
+              Write-Error "Error Type: $($result.ErrorType)"
+              Write-Error ""
+              if ($result.StackTrace) {
+                Write-Error "Stack Trace:"
+                Write-Error "$($result.StackTrace)"
+                Write-Error ""
+              }
               exit 1
             }
           }
           catch {
-            Write-Error "❌ EXCEPTION during tag creation: $_"
-            Write-Error $_.ScriptStackTrace
+            Write-Error "❌ EXCEPTION during tag creation!"
+            Write-Error ""
+            Write-Error "Exception Type: $($_.Exception.GetType().FullName)"
+            Write-Error "Error Message: $($_.Exception.Message)"
+            Write-Error ""
+            if ($_.ScriptStackTrace) {
+              Write-Error "Stack Trace:"
+              Write-Error "$($_.ScriptStackTrace)"
+            }
+            Write-Error ""
             exit 1
           }
 
