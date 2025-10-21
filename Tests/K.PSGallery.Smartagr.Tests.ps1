@@ -84,7 +84,7 @@ Describe "K.PSGallery.Smartagr Module" -Tag "Unit" {
             $module.PowerShellVersion | Should -Be '7.0'
         }
         
-        It "Should have proper module metadata" {
+        It "Should have proper module metadatas" {
             $module = Get-Module $script:ModuleName
             $module.Author | Should -Be '1d70f'
             $module.CompanyName | Should -Be '1d70f'
