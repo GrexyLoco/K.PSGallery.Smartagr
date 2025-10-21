@@ -33,7 +33,8 @@
     RequiredAssemblies = @()
 
     # Script files (.ps1) that are run in the caller's environment prior to importing this module.
-    ScriptsToProcess = @()
+    # SafeLogging.ps1 provides logging abstraction and must be loaded before the main module
+    ScriptsToProcess = @('src/SafeLogging.ps1')
 
     # Type files (.ps1xml) to be loaded when importing this module
     TypesToProcess = @()
@@ -43,6 +44,19 @@
 
     # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
     NestedModules = @()
+    
+    # List of all files packaged with this module (for documentation and validation)
+    FileList = @(
+        'K.PSGallery.Smartagr.psd1',
+        'K.PSGallery.Smartagr.psm1',
+        'LICENSE',
+        'README.md',
+        'src/SafeLogging.ps1',
+        'src/GitOperations.ps1',
+        'src/GitHubIntegration.ps1',
+        'src/GitHubReleaseManagement.ps1',
+        'src/SemanticVersionUtilities.ps1'
+    )
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
     FunctionsToExport = @(

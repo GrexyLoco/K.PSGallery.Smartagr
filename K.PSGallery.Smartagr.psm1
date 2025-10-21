@@ -45,20 +45,26 @@ try {
     Write-Host "                                  ▶ Error: $($_.Exception.Message)" -ForegroundColor Gray
 }
 
-# Load SafeLogging functions first (required by all other source files)
-$safeLoggingPath = Join-Path $PSScriptRoot "src\SafeLogging.ps1"
-if (Test-Path $safeLoggingPath) {
-    . $safeLoggingPath
-    Write-Host "[INFO] - SafeLogging functions loaded successfully" -ForegroundColor Green
-} else {
-    Write-Host "[ERROR] - SafeLogging.ps1 not found at: $safeLoggingPath" -ForegroundColor Red
+# SafeLogging functions are loaded via ScriptsToProcess in the manifest
+# Verify they are available (fail fast if module package is corrupted)
+if (-not (Get-Command 'Write-SafeInfoLog' -ErrorAction SilentlyContinue)) {
+    # SafeLogging.ps1 should have been loaded via ScriptsToProcess
+    # If not available, module package may be corrupted - try one more time to load it
+    $safeLoggingPath = Join-Path $PSScriptRoot "src" "SafeLogging.ps1"
+    if (Test-Path $safeLoggingPath) {
+        . $safeLoggingPath
+        Write-Verbose "SafeLogging functions loaded as fallback (ScriptsToProcess may have been skipped)"
+    } else {
+        throw "CRITICAL: SafeLogging functions not available and SafeLogging.ps1 not found at: $safeLoggingPath. Please reinstall the module with 'Install-Module K.PSGallery.Smartagr -Force'."
+    }
 }
 
 Write-SafeInfoLog -Message "K.PSGallery.Smartagr module initialization started"
 
-# Load all other PowerShell files from the src directory
+# Load all other PowerShell files from the src directory (SafeLogging.ps1 already loaded via ScriptsToProcess)
 $srcPath = Join-Path $PSScriptRoot "src"
 if (Test-Path $srcPath) {
+    # Exclude SafeLogging.ps1 as it's already loaded via ScriptsToProcess in manifest
     $sourceFiles = Get-ChildItem -Path $srcPath -Filter "*.ps1" -Recurse | Where-Object { $_.Name -ne "SafeLogging.ps1" }
     
     foreach ($file in $sourceFiles) {

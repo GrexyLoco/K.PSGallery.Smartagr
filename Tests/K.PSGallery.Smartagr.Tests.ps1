@@ -11,13 +11,13 @@ BeforeAll {
     # Clean up any existing module imports
     Get-Module $script:ModuleName | Remove-Module -Force -ErrorAction SilentlyContinue
     
-    # Import the module for testing - this loads all functions including private ones
+    # Import the module for testing - ScriptsToProcess automatically loads SafeLogging.ps1
     Import-Module $script:ModulePath -Force -ErrorAction Stop
     
-    # Import private functions directly from source files for testing 
+    # Import private functions directly from source files for testing (excluding SafeLogging - already loaded)
     $srcPath = Join-Path $PSScriptRoot '..' 'src'
     if (Test-Path $srcPath) {
-        Get-ChildItem -Path $srcPath -Filter '*.ps1' -Recurse | ForEach-Object {
+        Get-ChildItem -Path $srcPath -Filter '*.ps1' -Recurse | Where-Object { $_.Name -ne 'SafeLogging.ps1' } | ForEach-Object {
             Write-Verbose "Loading private function file for testing: $($_.Name)"
             . $_.FullName
         }
@@ -86,8 +86,8 @@ Describe "K.PSGallery.Smartagr Module" -Tag "Unit" {
         
         It "Should have proper module metadata" {
             $module = Get-Module $script:ModuleName
-            $module.Author | Should -Be 'K.PSGallery'
-            $module.CompanyName | Should -Be 'K.PSGallery'
+            $module.Author | Should -Be '1d70f'
+            $module.CompanyName | Should -Be '1d70f'
             $module.Description | Should -Not -BeNullOrEmpty
         }
     }
@@ -453,4 +453,92 @@ Describe "Public Functions Integration" -Tag "Integration" {
             Write-Verbose "Get-LatestSemanticTag available: $($getLatestTag -ne $null)"
         }
     }
+    
+    Context "SafeLogging Functions (ScriptsToProcess)" {
+        It "Should load SafeLogging functions via ScriptsToProcess" {
+            # Verify all 4 Safe functions are available globally
+            Get-Command Write-SafeInfoLog -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command Write-SafeWarningLog -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command Write-SafeErrorLog -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command Write-SafeDebugLog -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+        }
+        
+        It "Should have Write-SafeInfoLog with correct parameters" {
+            $cmd = Get-Command Write-SafeInfoLog -ErrorAction SilentlyContinue
+            $cmd | Should -Not -BeNullOrEmpty
+            $cmd.Parameters.Keys | Should -Contain 'Message'
+            $cmd.Parameters.Keys | Should -Contain 'Additional'
+        }
+        
+        It "Should execute Write-SafeInfoLog without errors" {
+            { Write-SafeInfoLog -Message "Test message" } | Should -Not -Throw
+            { Write-SafeInfoLog -Message "Test" -Additional @{ "Key" = "Value" } } | Should -Not -Throw
+        }
+    }
+    
+    Context "Cross-Platform Path Handling" {
+        It "Should construct paths correctly with Join-Path multiple arguments" {
+            $modulePath = Get-Module $script:ModuleName | Select-Object -ExpandProperty ModuleBase
+            
+            # Test cross-platform path construction
+            $testPath = Join-Path $modulePath "src" "SafeLogging.ps1"
+            
+            # Verify path uses correct separator for current platform
+            if ($IsWindows -or $PSVersionTable.PSVersion.Major -lt 6) {
+                $testPath | Should -Match '\\'  # Windows uses backslashes
+            } else {
+                $testPath | Should -Match '/'   # Linux/macOS use forward slashes
+            }
+            
+            # Verify file exists at constructed path
+            Test-Path $testPath | Should -Be $true
+        }
+        
+        It "Should load all source files from src directory" {
+            $modulePath = Get-Module $script:ModuleName | Select-Object -ExpandProperty ModuleBase
+            $srcPath = Join-Path $modulePath "src"
+            
+            Test-Path $srcPath | Should -Be $true
+            
+            $sourceFiles = Get-ChildItem -Path $srcPath -Filter "*.ps1" -Recurse
+            $sourceFiles.Count | Should -BeGreaterThan 0
+            
+            # Verify all expected source files exist
+            $expectedFiles = @(
+                'SafeLogging.ps1',
+                'GitOperations.ps1',
+                'GitHubIntegration.ps1',
+                'GitHubReleaseManagement.ps1',
+                'SemanticVersionUtilities.ps1'
+            )
+            
+            foreach ($expectedFile in $expectedFiles) {
+                $sourceFiles.Name | Should -Contain $expectedFile
+            }
+        }
+    }
+    
+    Context "Manifest Configuration (ScriptsToProcess & FileList)" {
+        It "Should have ScriptsToProcess defined in manifest" {
+            $manifestPath = Join-Path $PSScriptRoot '..' "$script:ModuleName.psd1"
+            $manifest = Import-PowerShellDataFile -Path $manifestPath
+            
+            $manifest.ScriptsToProcess | Should -Not -BeNullOrEmpty
+            $manifest.ScriptsToProcess | Should -Contain 'src/SafeLogging.ps1'
+        }
+        
+        It "Should have FileList defined in manifest" {
+            $manifestPath = Join-Path $PSScriptRoot '..' "$script:ModuleName.psd1"
+            $manifest = Import-PowerShellDataFile -Path $manifestPath
+            
+            $manifest.FileList | Should -Not -BeNullOrEmpty
+            $manifest.FileList.Count | Should -BeGreaterOrEqual 9
+            
+            # Verify key files are listed
+            $manifest.FileList | Should -Contain 'K.PSGallery.Smartagr.psd1'
+            $manifest.FileList | Should -Contain 'K.PSGallery.Smartagr.psm1'
+            $manifest.FileList | Should -Contain 'src/SafeLogging.ps1'
+        }
+    }
 }
+
