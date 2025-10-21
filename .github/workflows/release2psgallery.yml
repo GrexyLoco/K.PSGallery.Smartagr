@@ -132,37 +132,67 @@ jobs:
           
           Write-Host "✅ Manifest changes committed and pushed"
 
-      - name: 🏷️ Create Git Tag
+      - name: 🏷️ Create semantic release tags with Smartagr
         if: steps.version.outputs.newVersion != ''
+        shell: pwsh
         run: |
+          # � Configure Git for tagging
           git config user.name "${{ env.RELEASE_AUTHOR }}"
           git config user.email "${{ env.RELEASE_EMAIL }}"
           
-          # Check if tag already exists
-          if git rev-parse "v${{ steps.version.outputs.newVersion }}" >/dev/null 2>&1; then
-            echo "❌ ERROR: Tag v${{ steps.version.outputs.newVersion }} already exists!"
-            echo ""
-            echo "⚠️  MANIFEST-TAG-KONFLIKT ERKANNT"
-            echo "    Das Tag v${{ steps.version.outputs.newVersion }} existiert bereits, aber das"
-            echo "    Manifest wurde nicht entsprechend aktualisiert."
-            echo ""
-            echo "📋 Mögliche Ursachen:"
-            echo "    • Vorheriger Workflow-Run hat Tag erstellt, aber Manifest-Update fehlgeschlagen"
-            echo "    • Manueller Tag-Push ohne Manifest-Update"
-            echo "    • Manifest wurde nach Tag-Erstellung zurückgesetzt"
-            echo ""
-            echo "🔧 Lösungsvorschläge:"
-            echo "    1. Lösche das existierende Tag: git push --delete origin v${{ steps.version.outputs.newVersion }}"
-            echo "    2. Oder: Aktualisiere Manifest manuell auf ${{ steps.version.outputs.newVersion }} und pushe mit [skip ci]"
-            echo "    3. Dann: Starte den Workflow erneut"
-            echo ""
+          # �📦 Install K.PSGallery.Smartagr from PSGallery (latest stable)
+          Write-Host "📦 Installing K.PSGallery.Smartagr..."
+          Install-Module K.PSGallery.Smartagr -Force -Scope CurrentUser -AllowClobber
+          Import-Module K.PSGallery.Smartagr -Verbose
+          
+          # 🏷️ Create semantic release tags (base + smart tags)
+          Write-Host "🏷️ Creating semantic release tags for v${{ steps.version.outputs.newVersion }}..."
+          
+          $targetVersion = "v${{ steps.version.outputs.newVersion }}"
+          $repoPath = "${{ github.workspace }}"
+          
+          try {
+            $result = New-SemanticReleaseTags `
+              -TargetVersion $targetVersion `
+              -RepositoryPath $repoPath `
+              -PushToRemote `
+              -Verbose
+            
+            if ($result.Success) {
+              Write-Host "✅ Semantic release tags created successfully"
+              Write-Host "   Base tag: $targetVersion"
+              Write-Host "   Smart tags: $($result.SmartTags -join ', ')"
+              
+              # 📝 Add summary to GitHub Actions UI
+              @"
+          ## 🏷️ Semantic Tag Management (Smartagr)
+          
+          **Target Version:** ``$targetVersion``
+          **Bump Type:** ``${{ steps.version.outputs.bumpType }}``
+          
+          ### ✅ Tags Created
+          - **Base Tag:** ``$targetVersion``
+          - **Smart Tags:** $($result.SmartTags | ForEach-Object { "``$_``" } | Join-String -Separator ', ')
+          
+          ### 📊 Tag Strategy
+          - Smart tags automatically follow the latest release
+          - ``latest`` always points to newest stable version
+          - Major/Minor tags (e.g., ``v1``, ``v1.2``) enable flexible version pinning
+          
+          ---
+          *Powered by [K.PSGallery.Smartagr](https://www.powershellgallery.com/packages/K.PSGallery.Smartagr)*
+          "@ >> $env:GITHUB_STEP_SUMMARY
+              
+            } else {
+              Write-Error "❌ Semantic tag creation failed: $($result.Error)"
+              exit 1
+            }
+          }
+          catch {
+            Write-Error "❌ EXCEPTION during tag creation: $_"
+            Write-Error $_.ScriptStackTrace
             exit 1
-          fi
-          
-          git tag -a "v${{ steps.version.outputs.newVersion }}" -m "Release v${{ steps.version.outputs.newVersion }}"
-          git push origin "v${{ steps.version.outputs.newVersion }}"
-          
-          echo "✅ Tag v${{ steps.version.outputs.newVersion }} successfully created"
+          }
 
       - name: 📝 Release Summary
         if: always()
