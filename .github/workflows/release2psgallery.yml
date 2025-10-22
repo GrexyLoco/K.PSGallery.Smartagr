@@ -179,9 +179,9 @@ jobs:
               -Verbose
             
             if ($result.Success) {
-              Write-Host "✅ Semantic release tags created successfully"
-              Write-Host "   Target: $($result.TargetVersion)"
-              Write-Host "   All tags: $($result.AllTags -join ', ')"
+              Write-Output "✅ Semantic release tags created successfully"
+              Write-Output "   Target: $($result.TargetVersion)"
+              Write-Output "   All tags: $($result.AllTags -join ', ')"
               
               # 📝 Add summary to GitHub Actions UI
               @"
@@ -205,31 +205,11 @@ jobs:
           "@ >> $env:GITHUB_STEP_SUMMARY
               
             } else {
-              Write-Error "❌ Semantic tag creation failed!"
-              Write-Error ""
-              Write-Error "Error Message: $($result.Error)"
-              Write-Error "Error Type: $($result.ErrorType)"
-              Write-Error ""
-              if ($result.StackTrace) {
-                Write-Error "Stack Trace:"
-                Write-Error "$($result.StackTrace)"
-                Write-Error ""
-              }
-              exit 1
+              throw "Semantic tag creation failed: $($result.Message)"
             }
           }
           catch {
-            Write-Error "❌ EXCEPTION during tag creation!"
-            Write-Error ""
-            Write-Error "Exception Type: $($_.Exception.GetType().FullName)"
-            Write-Error "Error Message: $($_.Exception.Message)"
-            Write-Error ""
-            if ($_.ScriptStackTrace) {
-              Write-Error "Stack Trace:"
-              Write-Error "$($_.ScriptStackTrace)"
-            }
-            Write-Error ""
-            exit 1
+            throw
           }
 
       - name: 📝 Release Summary

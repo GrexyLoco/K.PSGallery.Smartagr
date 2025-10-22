@@ -256,11 +256,24 @@ function New-SemanticReleaseTags {
         }
     }
     catch {
+        # Log the error with full details
         Write-SafeErrorLog -Message "Failed to create semantic release tags" -Additional @{
             "TargetVersion" = $TargetVersion
             "Error" = $_.Exception.Message
             "StackTrace" = $_.ScriptStackTrace
         }
+        
+        # CRITICAL: Output error to console for visibility in CI/CD logs
+        Write-Warning "=== SMARTAGR TAG CREATION FAILED ==="
+        Write-Warning "Target Version: $TargetVersion"
+        Write-Warning "Error: $($_.Exception.Message)"
+        Write-Warning "Type: $($_.Exception.GetType().FullName)"
+        if ($_.Exception.InnerException) {
+            Write-Warning "Inner Exception: $($_.Exception.InnerException.Message)"
+        }
+        Write-Warning "Stack Trace:"
+        Write-Warning "$($_.ScriptStackTrace)"
+        Write-Warning "===================================="
         
         # For validation errors (ArgumentException), rethrow to allow proper error handling
         if ($_.Exception -is [System.ArgumentException] -or $_.Exception.Message -match "Invalid semantic version format") {
