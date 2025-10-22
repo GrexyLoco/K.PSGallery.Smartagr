@@ -187,13 +187,13 @@ function New-SemanticReleaseTags {
         try {
             # Validate Git repository
             if (-not $WhatIf) {
-                Confirm-GitRepository -RepositoryPath $RepositoryPath
+                Invoke-GitValidation -RepositoryPath $RepositoryPath
             } else {
                 Write-SafeInfoLog -Message "Skipping Git repository validation in WhatIf mode"
             }
             
             # Get existing tags
-            $existingTags = Get-GitTags -RepositoryPath $RepositoryPath
+            $existingTags = Get-ExistingSemanticTags -RepositoryPath $RepositoryPath
             
             # Validate target version
             Write-SafeInfoLog -Message "Starting target version validation" -Additional @{
@@ -202,7 +202,7 @@ function New-SemanticReleaseTags {
                 "Force" = $Force.IsPresent
             }
             
-            $validation = Test-TargetVersion -TargetVersion $normalizedVersion -ExistingTags $existingTags -Force:$Force
+            $validation = Test-TargetVersionValidity -TargetVersion $normalizedVersion -ExistingTags $existingTags -Force:$Force
             
             if (-not $validation.IsValid) {
                 throw "Version validation failed: $($validation.ErrorMessage)"
@@ -225,7 +225,21 @@ function New-SemanticReleaseTags {
                 }
             } else {
                 # Create the actual tags
-                Invoke-TagCreationStrategy -Strategy $strategy -RepositoryPath $RepositoryPath -WhatIf:$false
+                # 1. Create release tag
+                New-GitTag -TagName $strategy.ReleaseTag -RepositoryPath $RepositoryPath
+                
+                # 2. Create smart tags (pointing to release tag)
+                foreach ($smartTag in $strategy.SmartTagsToCreate) {
+                    New-GitTag -TagName $smartTag.Name -TargetRef $strategy.ReleaseTag -RepositoryPath $RepositoryPath -Force
+                }
+                
+                # 3. Update moving tags (pointing to release tag)
+                foreach ($movingTag in $strategy.MovingTagsToUpdate) {
+                    New-GitTag -TagName $movingTag.Name -TargetRef $strategy.ReleaseTag -RepositoryPath $RepositoryPath -Force
+                }
+                
+                # 4. Push all tags
+                Push-GitTags -RepositoryPath $RepositoryPath
                 
                 Write-SafeInfoLog -Message "Successfully created semantic release tags" -Additional @{
                     "ReleaseTag" = $strategy.ReleaseTag
