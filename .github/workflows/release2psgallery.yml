@@ -150,18 +150,18 @@ jobs:
       #     fi
 
       # DISABLED: Smartagr-based tagging (will be re-enabled after next publish)
-      - name: 🏷️ Create semantic release tags with Smartagr
+      - name: 🏷️ Create semantic release tags with Smartagr 
         if: steps.version.outputs.newVersion != ''
         shell: pwsh
         run: |
-          # � Configure Git for tagging
+          # 🔧 Configure Git for tagging
           git config user.name "${{ env.RELEASE_AUTHOR }}"
           git config user.email "${{ env.RELEASE_EMAIL }}"
           
-          # �📦 Install K.PSGallery.Smartagr from PSGallery (latest stable)
-          Write-Host "📦 Installing K.PSGallery.Smartagr..."
-          Install-Module K.PSGallery.Smartagr -Force -Scope CurrentUser -AllowClobber
-          Import-Module K.PSGallery.Smartagr -Verbose
+          #  Use LOCAL Smartagr module from repository (self-hosting)
+          Write-Host "📦 Importing local K.PSGallery.Smartagr module..."
+          Write-Host "   Path: ${{ github.workspace }}/K.PSGallery.Smartagr.psd1"
+          Import-Module "${{ github.workspace }}/K.PSGallery.Smartagr.psd1" -Force -Verbose
           
           # 🏷️ Create semantic release tags (base + smart tags)
           Write-Host "🏷️ Creating semantic release tags for v${{ steps.version.outputs.newVersion }}..."
