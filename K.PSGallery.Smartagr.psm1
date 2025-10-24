@@ -216,12 +216,12 @@ function New-SemanticReleaseTags {
                 Write-Host "WhatIf: Would create the following tags:" -ForegroundColor Yellow
                 Write-Host "  Release Tag: $normalizedVersion" -ForegroundColor Green
                 
-                foreach ($smartTag in $strategy.SmartTags) {
-                    Write-Host "  Smart Tag: $($smartTag.Name) → $($smartTag.Target)" -ForegroundColor Cyan
+                foreach ($smartTag in $strategy.SmartTagsToCreate) {
+                    Write-Host "  Smart Tag: $($smartTag.Name) → $normalizedVersion" -ForegroundColor Cyan
                 }
                 
-                foreach ($movingTag in $strategy.MovingTags) {
-                    Write-Host "  Moving Tag: $($movingTag.Name) → $($movingTag.Target)" -ForegroundColor Magenta
+                foreach ($movingTag in $strategy.MovingTagsToUpdate) {
+                    Write-Host "  Moving Tag: $($movingTag.Name) → $normalizedVersion" -ForegroundColor Magenta
                 }
             } else {
                 # Create the actual tags
