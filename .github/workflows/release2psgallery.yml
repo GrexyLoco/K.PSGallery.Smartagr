@@ -183,6 +183,18 @@ jobs:
               Write-Output "   Target: $($result.TargetVersion)"
               Write-Output "   All tags: $($result.AllTags -join ', ')"
               
+              # Format tag lists for summary (handle empty arrays)
+              $smartTagsList = if ($result.SmartTags.Count -gt 0) { 
+                ($result.SmartTags | ForEach-Object { "``$_``" }) -join ', ' 
+              } else { 
+                "_(none)_" 
+              }
+              $movingTagsList = if ($result.MovingTags.Count -gt 0) { 
+                ($result.MovingTags | ForEach-Object { "``$_``" }) -join ', ' 
+              } else { 
+                "_(none)_" 
+              }
+              
               # 📝 Add summary to GitHub Actions UI
               @"
           ## 🏷️ Semantic Tag Management (Smartagr)
@@ -192,8 +204,8 @@ jobs:
           
           ### ✅ Tags Created
           - **Release Tag:** ``$($result.ReleaseTag)``
-          - **Smart Tags:** $($result.SmartTags | ForEach-Object { "``$_``" } | Join-String -Separator ', ')
-          - **Moving Tags:** $($result.MovingTags | ForEach-Object { "``$_``" } | Join-String -Separator ', ')
+          - **Smart Tags:** $smartTagsList
+          - **Moving Tags:** $movingTagsList
           
           ### 📊 Tag Strategy
           - Smart tags automatically follow the latest release

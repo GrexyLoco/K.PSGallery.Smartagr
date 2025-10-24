@@ -235,18 +235,21 @@ function New-SemanticReleaseTags {
                 }
             }
             
-            # Collect all created/updated tags for result
-            $allTags = @()
-            $allTags += $normalizedVersion
-            $allTags += $strategy.SmartTagsToCreate.Name
-            $allTags += $strategy.MovingTagsToUpdate.Name
+            # Collect all created/updated tags for result (filter out empty values)
+            $allTags = @($normalizedVersion)
+            if ($strategy.SmartTagsToCreate.Name) {
+                $allTags += @($strategy.SmartTagsToCreate.Name | Where-Object { $_ })
+            }
+            if ($strategy.MovingTagsToUpdate.Name) {
+                $allTags += @($strategy.MovingTagsToUpdate.Name | Where-Object { $_ })
+            }
             
             return @{
                 Success = $true
                 TargetVersion = $normalizedVersion
                 ReleaseTag = $normalizedVersion
-                SmartTags = $strategy.SmartTagsToCreate.Name
-                MovingTags = $strategy.MovingTagsToUpdate.Name
+                SmartTags = @($strategy.SmartTagsToCreate.Name | Where-Object { $_ })
+                MovingTags = @($strategy.MovingTagsToUpdate.Name | Where-Object { $_ })
                 AllTags = $allTags
                 Message = "Semantic release tags created successfully"
             }
