@@ -214,7 +214,7 @@ function New-SemanticReleaseTags {
             # Execute or preview the strategy
             if ($WhatIf) {
                 Write-Host "WhatIf: Would create the following tags:" -ForegroundColor Yellow
-                Write-Host "  Release Tag: $($strategy.ReleaseTag)" -ForegroundColor Green
+                Write-Host "  Release Tag: $normalizedVersion" -ForegroundColor Green
                 
                 foreach ($smartTag in $strategy.SmartTags) {
                     Write-Host "  Smart Tag: $($smartTag.Name) → $($smartTag.Target)" -ForegroundColor Cyan
@@ -226,23 +226,23 @@ function New-SemanticReleaseTags {
             } else {
                 # Create the actual tags
                 # 1. Create release tag
-                New-GitTag -TagName $strategy.ReleaseTag -RepositoryPath $RepositoryPath
+                New-GitTag -TagName $normalizedVersion -RepositoryPath $RepositoryPath
                 
                 # 2. Create smart tags (pointing to release tag)
                 foreach ($smartTag in $strategy.SmartTagsToCreate) {
-                    New-GitTag -TagName $smartTag.Name -TargetRef $strategy.ReleaseTag -RepositoryPath $RepositoryPath -Force
+                    New-GitTag -TagName $smartTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force
                 }
                 
                 # 3. Update moving tags (pointing to release tag)
                 foreach ($movingTag in $strategy.MovingTagsToUpdate) {
-                    New-GitTag -TagName $movingTag.Name -TargetRef $strategy.ReleaseTag -RepositoryPath $RepositoryPath -Force
+                    New-GitTag -TagName $movingTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force
                 }
                 
                 # 4. Push all tags
                 Push-GitTags -RepositoryPath $RepositoryPath
                 
                 Write-SafeInfoLog -Message "Successfully created semantic release tags" -Additional @{
-                    "ReleaseTag" = $strategy.ReleaseTag
+                    "ReleaseTag" = $normalizedVersion
                     "SmartTagCount" = $strategy.SmartTagsToCreate.Count
                     "MovingTagCount" = $strategy.MovingTagsToUpdate.Count
                 }
@@ -250,14 +250,14 @@ function New-SemanticReleaseTags {
             
             # Collect all created/updated tags for result
             $allTags = @()
-            $allTags += $strategy.ReleaseTag
+            $allTags += $normalizedVersion
             $allTags += $strategy.SmartTagsToCreate.Name
             $allTags += $strategy.MovingTagsToUpdate.Name
             
             return @{
                 Success = $true
                 TargetVersion = $normalizedVersion
-                ReleaseTag = $strategy.ReleaseTag
+                ReleaseTag = $normalizedVersion
                 SmartTags = $strategy.SmartTagsToCreate.Name
                 MovingTags = $strategy.MovingTagsToUpdate.Name
                 AllTags = $allTags
