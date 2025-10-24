@@ -186,7 +186,7 @@ function New-SemanticReleaseTags {
         
         try {
             # Validate Git repository (skip in WhatIf mode)
-            if ($PSCmdlet.ShouldProcess("Git repository at '$RepositoryPath'", "Validate repository")) {
+            if ($PSCmdlet.ShouldProcess("Validate repository", "Git repository at '$RepositoryPath'")) {
                 Invoke-GitValidation -RepositoryPath $RepositoryPath
             }
             
