@@ -185,11 +185,9 @@ function New-SemanticReleaseTags {
         }
         
         try {
-            # Validate Git repository
-            if (-not $WhatIf) {
+            # Validate Git repository (skip in WhatIf mode)
+            if ($PSCmdlet.ShouldProcess("Validate repository", "Git repository at '$RepositoryPath'")) {
                 Invoke-GitValidation -RepositoryPath $RepositoryPath
-            } else {
-                Write-SafeInfoLog -Message "Skipping Git repository validation in WhatIf mode"
             }
             
             # Get existing tags
@@ -212,37 +210,26 @@ function New-SemanticReleaseTags {
             $strategy = Get-SmartTagStrategy -TargetVersion $normalizedVersion -ExistingTags $existingTags
             
             # Execute or preview the strategy
-            if ($WhatIf) {
-                Write-Host "WhatIf: Would create the following tags:" -ForegroundColor Yellow
-                Write-Host "  Release Tag: $($strategy.ReleaseTag)" -ForegroundColor Green
-                
-                foreach ($smartTag in $strategy.SmartTags) {
-                    Write-Host "  Smart Tag: $($smartTag.Name) → $($smartTag.Target)" -ForegroundColor Cyan
-                }
-                
-                foreach ($movingTag in $strategy.MovingTags) {
-                    Write-Host "  Moving Tag: $($movingTag.Name) → $($movingTag.Target)" -ForegroundColor Magenta
-                }
-            } else {
+            if ($PSCmdlet.ShouldProcess("Semantic version tags for $normalizedVersion", "Create tags")) {
                 # Create the actual tags
                 # 1. Create release tag
-                New-GitTag -TagName $strategy.ReleaseTag -RepositoryPath $RepositoryPath
+                New-GitTag -TagName $normalizedVersion -RepositoryPath $RepositoryPath
                 
                 # 2. Create smart tags (pointing to release tag)
                 foreach ($smartTag in $strategy.SmartTagsToCreate) {
-                    New-GitTag -TagName $smartTag.Name -TargetRef $strategy.ReleaseTag -RepositoryPath $RepositoryPath -Force
+                    New-GitTag -TagName $smartTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force
                 }
                 
                 # 3. Update moving tags (pointing to release tag)
                 foreach ($movingTag in $strategy.MovingTagsToUpdate) {
-                    New-GitTag -TagName $movingTag.Name -TargetRef $strategy.ReleaseTag -RepositoryPath $RepositoryPath -Force
+                    New-GitTag -TagName $movingTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force
                 }
                 
                 # 4. Push all tags
                 Push-GitTags -RepositoryPath $RepositoryPath
                 
                 Write-SafeInfoLog -Message "Successfully created semantic release tags" -Additional @{
-                    "ReleaseTag" = $strategy.ReleaseTag
+                    "ReleaseTag" = $normalizedVersion
                     "SmartTagCount" = $strategy.SmartTagsToCreate.Count
                     "MovingTagCount" = $strategy.MovingTagsToUpdate.Count
                 }
@@ -250,14 +237,14 @@ function New-SemanticReleaseTags {
             
             # Collect all created/updated tags for result
             $allTags = @()
-            $allTags += $strategy.ReleaseTag
+            $allTags += $normalizedVersion
             $allTags += $strategy.SmartTagsToCreate.Name
             $allTags += $strategy.MovingTagsToUpdate.Name
             
             return @{
                 Success = $true
                 TargetVersion = $normalizedVersion
-                ReleaseTag = $strategy.ReleaseTag
+                ReleaseTag = $normalizedVersion
                 SmartTags = $strategy.SmartTagsToCreate.Name
                 MovingTags = $strategy.MovingTagsToUpdate.Name
                 AllTags = $allTags

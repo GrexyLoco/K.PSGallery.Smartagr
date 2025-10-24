@@ -1,6 +1,25 @@
 # K.PSGallery.Smartagr
 
+[![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/K.PSGallery.Smartagr?logo=powershell&logoColor=white)](https://www.powershellgallery.com/packages/K.PSGallery.Smartagr)
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/K.PSGallery.Smartagr?logo=powershell&logoColor=white)](https://www.powershellgallery.com/packages/K.PSGallery.Smartagr)
+[![GitHub Release](https://img.shields.io/github/v/release/GrexyLoco/K.PSGallery.Smartagr?logo=github)](https://github.com/GrexyLoco/K.PSGallery.Smartagr/releases)
+[![License](https://img.shields.io/github/license/GrexyLoco/K.PSGallery.Smartagr)](https://github.com/GrexyLoco/K.PSGallery.Smartagr/blob/master/LICENSE)
+[![CI/CD](https://img.shields.io/github/actions/workflow/status/GrexyLoco/K.PSGallery.Smartagr/check_and_dispatch.yml?branch=master&label=CI%2FCD&logo=github)](https://github.com/GrexyLoco/K.PSGallery.Smartagr/actions)
+
 **Smartagr**: Smart Git tag management with semantic versioning intelligence. The smart tag aggregator that automates creation and management of semantic version tags with intelligent strategies for major, minor, and patch releases.
+
+---
+
+## 📦 Release History
+
+| Version | Release Date | Type | Highlights |
+|---------|--------------|------|------------|
+| [v0.1.11](https://github.com/GrexyLoco/K.PSGallery.Smartagr/releases/tag/v0.1.11) | TBD | Patch | Current stable release |
+
+**Current Stable**: [![v0.1.11](https://img.shields.io/badge/v0.1.11-stable-brightgreen?logo=github)](https://github.com/GrexyLoco/K.PSGallery.Smartagr/releases/tag/v0.1.11)  
+**Smart Tags**: `latest`, `v0`, `v0.1` (all point to v0.1.11)
+
+---
 
 ## 🎯 Smart Tag Intelligence
 
