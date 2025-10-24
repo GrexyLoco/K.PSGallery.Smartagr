@@ -185,11 +185,9 @@ function New-SemanticReleaseTags {
         }
         
         try {
-            # Validate Git repository
-            if (-not $WhatIf) {
+            # Validate Git repository (skip in WhatIf mode)
+            if ($PSCmdlet.ShouldProcess("Git repository at '$RepositoryPath'", "Validate repository")) {
                 Invoke-GitValidation -RepositoryPath $RepositoryPath
-            } else {
-                Write-SafeInfoLog -Message "Skipping Git repository validation in WhatIf mode"
             }
             
             # Get existing tags
@@ -212,18 +210,7 @@ function New-SemanticReleaseTags {
             $strategy = Get-SmartTagStrategy -TargetVersion $normalizedVersion -ExistingTags $existingTags
             
             # Execute or preview the strategy
-            if ($WhatIf) {
-                Write-Host "WhatIf: Would create the following tags:" -ForegroundColor Yellow
-                Write-Host "  Release Tag: $normalizedVersion" -ForegroundColor Green
-                
-                foreach ($smartTag in $strategy.SmartTagsToCreate) {
-                    Write-Host "  Smart Tag: $($smartTag.Name) → $normalizedVersion" -ForegroundColor Cyan
-                }
-                
-                foreach ($movingTag in $strategy.MovingTagsToUpdate) {
-                    Write-Host "  Moving Tag: $($movingTag.Name) → $normalizedVersion" -ForegroundColor Magenta
-                }
-            } else {
+            if ($PSCmdlet.ShouldProcess("Semantic version tags for $normalizedVersion", "Create tags")) {
                 # Create the actual tags
                 # 1. Create release tag
                 New-GitTag -TagName $normalizedVersion -RepositoryPath $RepositoryPath
