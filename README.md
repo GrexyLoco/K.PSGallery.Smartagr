@@ -14,7 +14,7 @@
 
 | Version | Release Date | Type | Highlights |
 |---------|--------------|------|------------|
-| [v0.1.11](https://github.com/GrexyLoco/K.PSGallery.Smartagr/releases/tag/v0.1.11) | Oct 24, 2025 | Patch | Current stable release |
+| [v0.1.11](https://github.com/GrexyLoco/K.PSGallery.Smartagr/releases/tag/v0.1.11) | TBD | Patch | Current stable release |
 
 **Current Stable**: [![v0.1.11](https://img.shields.io/badge/v0.1.11-stable-brightgreen?logo=github)](https://github.com/GrexyLoco/K.PSGallery.Smartagr/releases/tag/v0.1.11)  
 **Smart Tags**: `latest`, `v0`, `v0.1` (all point to v0.1.11)
