@@ -9,10 +9,10 @@ function Write-SafeInfoLog {
     if (Get-Command 'Write-InfoLog' -ErrorAction SilentlyContinue) {
         Write-InfoLog -Message $Message -Additional $Additional
     } else {
-        Write-Host "[INFO] - $Message" -ForegroundColor Green
+        Write-Output "[INFO] - $Message"
         if ($Additional.Count -gt 0) {
             $Additional.GetEnumerator() | ForEach-Object {
-                Write-Host "                               ▶ $($_.Key): $($_.Value)" -ForegroundColor Gray
+                Write-Output "         ▶ $($_.Key): $($_.Value)"
             }
         }
     }
@@ -24,10 +24,10 @@ function Write-SafeWarningLog {
     if (Get-Command 'Write-WarningLog' -ErrorAction SilentlyContinue) {
         Write-WarningLog -Message $Message -Additional $Additional
     } else {
-        Write-Host "[WARNING] - $Message" -ForegroundColor Yellow
+        Write-Warning "$Message"
         if ($Additional.Count -gt 0) {
             $Additional.GetEnumerator() | ForEach-Object {
-                Write-Host "                                  ▶ $($_.Key): $($_.Value)" -ForegroundColor Gray
+                Write-Warning "  ▶ $($_.Key): $($_.Value)"
             }
         }
     }
@@ -39,10 +39,10 @@ function Write-SafeErrorLog {
     if (Get-Command 'Write-ErrorLog' -ErrorAction SilentlyContinue) {
         Write-ErrorLog -Message $Message -Additional $Additional
     } else {
-        Write-Host "[ERROR] - $Message" -ForegroundColor Red
+        Write-Error "$Message"
         if ($Additional.Count -gt 0) {
             $Additional.GetEnumerator() | ForEach-Object {
-                Write-Host "                                ▶ $($_.Key): $($_.Value)" -ForegroundColor Gray
+                Write-Error "  ▶ $($_.Key): $($_.Value)"
             }
         }
     }
@@ -54,10 +54,10 @@ function Write-SafeDebugLog {
     if (Get-Command 'Write-DebugLog' -ErrorAction SilentlyContinue) {
         Write-DebugLog -Message $Message -Additional $Additional
     } else {
-        Write-Host "[DEBUG] - $Message" -ForegroundColor Cyan
+        Write-Verbose "[DEBUG] - $Message"
         if ($Additional.Count -gt 0) {
             $Additional.GetEnumerator() | ForEach-Object {
-                Write-Host "                                 ▶ $($_.Key): $($_.Value)" -ForegroundColor Gray
+                Write-Verbose "         ▶ $($_.Key): $($_.Value)"
             }
         }
     }
