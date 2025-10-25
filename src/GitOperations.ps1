@@ -326,9 +326,9 @@ function Push-GitTags {
                 if ($Force) { $pushArgs += '--force' }
                 $pushArgs += @('origin', $tag)
                 
-                & git @pushArgs 2>$null
+                $gitError = & git @pushArgs 2>&1
                 if ($LASTEXITCODE -ne 0) {
-                    $result.ErrorMessage = "Failed to push tag '$tag' to remote."
+                    $result.ErrorMessage = "Failed to push tag '$tag' to remote. Git error: $gitError"
                     return $result
                 }
             }
@@ -338,9 +338,9 @@ function Push-GitTags {
             if ($Force) { $pushArgs += '--force' }
             $pushArgs += @('origin', '--tags')
             
-            & git @pushArgs 2>$null
+            $gitError = & git @pushArgs 2>&1
             if ($LASTEXITCODE -ne 0) {
-                $result.ErrorMessage = "Failed to push tags to remote."
+                $result.ErrorMessage = "Failed to push tags to remote. Git error: $gitError"
                 return $result
             }
         }
