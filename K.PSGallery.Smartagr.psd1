@@ -3,7 +3,7 @@
     RootModule = 'K.PSGallery.Smartagr.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.1.32'
+    ModuleVersion = '0.1.33'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Desktop', 'Core')
