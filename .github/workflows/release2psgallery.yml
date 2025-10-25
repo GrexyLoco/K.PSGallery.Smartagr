@@ -181,20 +181,20 @@ jobs:
           
           # 📦 Import Smartagr module (strategy controlled by SMARTAGR_USE_PSGALLERY variable)
           if ('${{ env.USE_PSGALLERY_SMARTAGR }}' -eq 'true') {
-            Write-Host "📦 Importing K.PSGallery.Smartagr from PSGallery (stable release)..."
-            Write-Host "   ℹ️  Using published version (one-version-behind strategy)"
+            Write-Output "📦 Importing K.PSGallery.Smartagr from PSGallery (stable release)..."
+            Write-Output "   ℹ️  Using published version (one-version-behind strategy)"
             # Ensure we have latest published version
             Install-Module -Name K.PSGallery.Smartagr -Force -Scope CurrentUser -AllowClobber -Verbose
             Import-Module K.PSGallery.Smartagr -Force -Verbose
           } else {
-            Write-Host "📦 Importing LOCAL K.PSGallery.Smartagr module (self-hosting)..."
-            Write-Host "   Path: ${{ github.workspace }}/K.PSGallery.Smartagr.psd1"
-            Write-Host "   ℹ️  Using local version (bootstrap/breaking-changes mode)"
+            Write-Output "📦 Importing LOCAL K.PSGallery.Smartagr module (self-hosting)..."
+            Write-Output "   Path: ${{ github.workspace }}/K.PSGallery.Smartagr.psd1"
+            Write-Output "   ℹ️  Using local version (bootstrap/breaking-changes mode)"
             Import-Module "${{ github.workspace }}/K.PSGallery.Smartagr.psd1" -Force -Verbose
           }
           
           # 🏷️ Create semantic release tags (base + smart tags)
-          Write-Host "🏷️ Creating semantic release tags for v${{ steps.version.outputs.newVersion }}..."
+          Write-Output "🏷️ Creating semantic release tags for v${{ steps.version.outputs.newVersion }}..."
           
           $targetVersion = "v${{ steps.version.outputs.newVersion }}"
           $repoPath = "${{ github.workspace }}"
@@ -209,7 +209,7 @@ jobs:
               -Verbose
             
             if ($result.Success) {
-              Write-Output "✅ Semantic release tags created successfully"
+              Write-Output $result.Message
               Write-Output "   Target: $($result.TargetVersion)"
               Write-Output "   All tags: $($result.AllTags -join ', ')"
               
