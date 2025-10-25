@@ -32,18 +32,17 @@ Write-Information "Loading K.PSGallery.Smartagr module.."
 # Try to ensure LoggingModule is available for structured logging
 try {
     if (-not (Get-Module -Name "K.PSGallery.LoggingModule" -ListAvailable)) {
-        Write-Host "[INFO] - LoggingModule not found, attempting to install" -ForegroundColor Green
+        Write-Verbose "[INFO] - LoggingModule not found, attempting to install"
         Install-Module -Name "K.PSGallery.LoggingModule" -Force -Scope CurrentUser -ErrorAction Stop
-        Write-Host "[INFO] - LoggingModule installed successfully" -ForegroundColor Green
+        Write-Verbose "[INFO] - LoggingModule installed successfully"
     }
     
     if (-not (Get-Module -Name "K.PSGallery.LoggingModule")) {
         Import-Module -Name "K.PSGallery.LoggingModule" -Force -ErrorAction Stop
-        Write-Host "[INFO] - LoggingModule imported successfully" -ForegroundColor Green
+        Write-Verbose "[INFO] - LoggingModule imported successfully"
     }
 } catch {
-    Write-Host "[WARNING] - Could not install/import LoggingModule, using fallback logging" -ForegroundColor Yellow
-    Write-Host "                                  ▶ Error: $($_.Exception.Message)" -ForegroundColor Gray
+    Write-Warning "Could not install/import LoggingModule, using fallback logging. Error: $($_.Exception.Message)"
 }
 
 # SafeLogging functions are loaded via ScriptsToProcess in the manifest
@@ -242,27 +241,27 @@ function New-SemanticReleaseTags {
             $allTags = @($normalizedVersion)
             
             # DEBUG: Output strategy object details BEFORE filtering
-            Write-Host "=== STRATEGY DEBUG START ===" -ForegroundColor Cyan
-            Write-Host "SmartTagsToCreate Count: $($strategy.SmartTagsToCreate.Count)" -ForegroundColor Yellow
-            Write-Host "SmartTagsToCreate JSON:" -ForegroundColor Yellow
-            Write-Host ($strategy.SmartTagsToCreate | ConvertTo-Json -Depth 3) -ForegroundColor Gray
-            Write-Host "MovingTagsToUpdate Count: $($strategy.MovingTagsToUpdate.Count)" -ForegroundColor Yellow
-            Write-Host "MovingTagsToUpdate JSON:" -ForegroundColor Yellow
-            Write-Host ($strategy.MovingTagsToUpdate | ConvertTo-Json -Depth 3) -ForegroundColor Gray
-            Write-Host "=== STRATEGY DEBUG END ===" -ForegroundColor Cyan
+            Write-Verbose "=== STRATEGY DEBUG START ==="
+            Write-Verbose "SmartTagsToCreate Count: $($strategy.SmartTagsToCreate.Count)"
+            Write-Verbose "SmartTagsToCreate JSON:"
+            Write-Verbose ($strategy.SmartTagsToCreate | ConvertTo-Json -Depth 3)
+            Write-Verbose "MovingTagsToUpdate Count: $($strategy.MovingTagsToUpdate.Count)"
+            Write-Verbose "MovingTagsToUpdate JSON:"
+            Write-Verbose ($strategy.MovingTagsToUpdate | ConvertTo-Json -Depth 3)
+            Write-Verbose "=== STRATEGY DEBUG END ==="
             
             if ($strategy.SmartTagsToCreate) {
                 $smartTagNames = @($strategy.SmartTagsToCreate | ForEach-Object { $_.Name } | Where-Object { $_ })
-                Write-Host "SmartTagNames extracted: [$($smartTagNames -join ', ')]" -ForegroundColor Magenta
+                Write-Verbose "SmartTagNames extracted: [$($smartTagNames -join ', ')]"
                 $allTags += $smartTagNames
             }
             if ($strategy.MovingTagsToUpdate) {
                 $movingTagNames = @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
-                Write-Host "MovingTagNames extracted: [$($movingTagNames -join ', ')]" -ForegroundColor Magenta
+                Write-Verbose "MovingTagNames extracted: [$($movingTagNames -join ', ')]"
                 $allTags += $movingTagNames
             }
             
-            Write-Host "AllTags final: [$($allTags -join ', ')]" -ForegroundColor Green
+            Write-Verbose "AllTags final: [$($allTags -join ', ')]"
             
             return @{
                 Success = $true
