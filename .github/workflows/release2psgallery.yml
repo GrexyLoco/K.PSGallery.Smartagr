@@ -27,6 +27,27 @@ env:
   # 📦 Module Configuration (can be overridden by repository variables)
   MODULE_NAME: ${{ vars.MODULE_NAME || 'K.PSGallery.SmartAgr' }}
   TARGET_REPOSITORY: ${{ vars.TARGET_REPOSITORY || 'GrexyLoco/K.PSGallery' }}
+  
+  # 🔄 Smartagr Import Strategy (Bootstrap Configuration)
+  # ⚠️ IMPORTANT: This controls where Smartagr module is loaded from during tag creation
+  # 
+  # Repository Variable: SMARTAGR_USE_PSGALLERY (boolean)
+  #   - Not set or 'false' = Import from LOCAL repository (default, self-hosting)
+  #   - 'true'            = Import from PSGallery (stable releases, one-version-behind)
+  # 
+  # 📌 Migration Path:
+  #    1. Pre-v1.0.0:  No variable set → LOCAL import (bootstrap phase)
+  #    2. Post-v1.0.0: Set variable to 'true' → PSGallery import (stable phase)
+  #    3. Breaking changes: Set to 'false' temporarily → LOCAL import
+  # 
+  # ⚠️ Trade-offs:
+  #    - Local:    Version N tags version N (self-tagging, breaking changes supported)
+  #    - PSGallery: Version N tags version N+1 (feature lag, stable releases only)
+  # 
+  # 🔧 How to configure: Settings → Secrets and variables → Actions → Variables
+  #    Variable name: SMARTAGR_USE_PSGALLERY
+  #    Variable value: true (for PSGallery) or false/unset (for local)
+  USE_PSGALLERY_SMARTAGR: ${{ vars.SMARTAGR_USE_PSGALLERY || 'false' }}
 
 jobs:
   quality-gate:
@@ -158,10 +179,19 @@ jobs:
           git config user.name "${{ env.RELEASE_AUTHOR }}"
           git config user.email "${{ env.RELEASE_EMAIL }}"
           
-          #  Use LOCAL Smartagr module from repository (self-hosting)
-          Write-Host "📦 Importing local K.PSGallery.Smartagr module..."
-          Write-Host "   Path: ${{ github.workspace }}/K.PSGallery.Smartagr.psd1"
-          Import-Module "${{ github.workspace }}/K.PSGallery.Smartagr.psd1" -Force -Verbose
+          # 📦 Import Smartagr module (strategy controlled by SMARTAGR_USE_PSGALLERY variable)
+          if ('${{ env.USE_PSGALLERY_SMARTAGR }}' -eq 'true') {
+            Write-Host "📦 Importing K.PSGallery.Smartagr from PSGallery (stable release)..."
+            Write-Host "   ℹ️  Using published version (one-version-behind strategy)"
+            # Ensure we have latest published version
+            Install-Module -Name K.PSGallery.Smartagr -Force -Scope CurrentUser -AllowClobber -Verbose
+            Import-Module K.PSGallery.Smartagr -Force -Verbose
+          } else {
+            Write-Host "📦 Importing LOCAL K.PSGallery.Smartagr module (self-hosting)..."
+            Write-Host "   Path: ${{ github.workspace }}/K.PSGallery.Smartagr.psd1"
+            Write-Host "   ℹ️  Using local version (bootstrap/breaking-changes mode)"
+            Import-Module "${{ github.workspace }}/K.PSGallery.Smartagr.psd1" -Force -Verbose
+          }
           
           # 🏷️ Create semantic release tags (base + smart tags)
           Write-Host "🏷️ Creating semantic release tags for v${{ steps.version.outputs.newVersion }}..."

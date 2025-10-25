@@ -317,6 +317,65 @@ Import-Module ./K.PSGallery.Smartagr.psd1 -Force
 Invoke-Pester -Path ./Tests/
 ```
 
+## 🔄 CI/CD & Self-Hosting Strategy
+
+### Bootstrap Configuration
+
+The `release2psgallery.yml` workflow uses a **smart import strategy** controlled by the repository variable `SMARTAGR_USE_PSGALLERY`:
+
+| Variable Status | Import Source | Use Case | Behavior |
+|----------------|---------------|----------|----------|
+| **Not set** (default:false) | 🏠 **LOCAL** | Bootstrap, Pre-v1.0.0 | Version N tags version N (self-tagging) |
+| `false` | 🏠 **LOCAL** | Breaking changes | Same version self-tagging |
+| `true` | 📦 **PSGallery** | Stable releases (Post-v1.0.0) | Version N+1 tagged by version N |
+
+### Configuration Steps
+
+**For Initial Bootstrap (Current State):**
+```
+No action needed - defaults to LOCAL import
+✓ Version 0.1.27 will tag itself using its own code
+```
+
+**After Successful v1.0.0 Release:**
+```
+Repository Settings → Secrets and variables → Actions → Variables tab
+→ New repository variable
+   Name:  SMARTAGR_USE_PSGALLERY
+   Value: true
+
+✓ Version 1.0.1 will be tagged using PSGallery version 1.0.0
+✓ Ensures only stable, tested code is used for tagging
+```
+
+**For Breaking Changes (Temporary):**
+```
+Edit repository variable:
+   SMARTAGR_USE_PSGALLERY → false
+
+✓ New version uses its own latest code
+✓ Switch back to 'true' after successful release
+```
+
+### Trade-offs & Safety
+
+**Local Import (Bootstrap Mode):**
+- ✅ Self-tagging: Version N creates tags for version N
+- ✅ Breaking changes supported immediately
+- ⚠️ Uses unreleased code for tagging
+
+**PSGallery Import (Stable Mode):**
+- ✅ Only tested, published versions used
+- ✅ Stable, predictable behavior
+- ⚠️ Feature lag: Version N+1 tagged by version N
+- ⚠️ Can't use features newer than last published version
+
+**Rollback Strategy:**
+- All versions are tagged and preserved in Git
+- PSGallery maintains all published versions
+- Use `git revert` or re-publish previous version if needed
+- CI tests prevent broken releases from being published
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
