@@ -268,8 +268,8 @@ function New-SemanticReleaseTags {
                 Success = $true
                 TargetVersion = $normalizedVersion
                 ReleaseTag = $normalizedVersion
-                SmartTags = @($strategy.SmartTagsToCreate.Name | Where-Object { $_ })
-                MovingTags = @($strategy.MovingTagsToUpdate.Name | Where-Object { $_ })
+                SmartTags = @($strategy.SmartTagsToCreate | ForEach-Object { $_.Name } | Where-Object { $_ })
+                MovingTags = @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
                 AllTags = $allTags
                 Message = "Semantic release tags created successfully"
             }
