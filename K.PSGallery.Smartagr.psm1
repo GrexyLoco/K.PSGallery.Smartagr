@@ -260,9 +260,13 @@ function New-SemanticReleaseTags {
                 $allTags += $smartTagNames
             }
             if ($strategy.MovingTagsToUpdate) {
-                $movingTagNames = @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
+                # MovingTagsToUpdate can be a single object or array - ensure array handling
+                $movingTagsArray = @($strategy.MovingTagsToUpdate)
+                $movingTagNames = @($movingTagsArray | ForEach-Object { $_.Name } | Where-Object { $_ })
                 Write-SafeDebugLog -Message "MovingTagNames extracted" -Additional @{
                     "Tags" = ($movingTagNames -join ', ')
+                    "MovingTagsArrayCount" = $movingTagsArray.Count
+                    "MovingTagsArrayType" = $movingTagsArray.GetType().Name
                 }
                 $allTags += $movingTagNames
             }
@@ -276,7 +280,7 @@ function New-SemanticReleaseTags {
                 TargetVersion = $normalizedVersion
                 ReleaseTag = $normalizedVersion
                 SmartTags = @($strategy.SmartTagsToCreate | ForEach-Object { $_.Name } | Where-Object { $_ })
-                MovingTags = @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
+                MovingTags = @(@($strategy.MovingTagsToUpdate) | ForEach-Object { $_.Name } | Where-Object { $_ })
                 AllTags = $allTags
                 Message = "Semantic release tags created successfully"
             }
