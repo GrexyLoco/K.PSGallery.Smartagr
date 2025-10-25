@@ -215,21 +215,33 @@ function New-SemanticReleaseTags {
             # Execute or preview the strategy
             if ($PSCmdlet.ShouldProcess("Semantic version tags for $normalizedVersion", "Create tags")) {
                 # Create the actual tags
-                # 1. Create release tag (suppress pipeline output)
-                [void](New-GitTag -TagName $normalizedVersion -RepositoryPath $RepositoryPath)
+                # 1. Create release tag (check for errors)
+                $tagResult = New-GitTag -TagName $normalizedVersion -RepositoryPath $RepositoryPath
+                if (-not $tagResult.Success) {
+                    throw "Failed to create release tag '$normalizedVersion': $($tagResult.ErrorMessage)"
+                }
                 
                 # 2. Create smart tags (pointing to release tag, suppress output)
                 foreach ($smartTag in $strategy.SmartTagsToCreate) {
-                    [void](New-GitTag -TagName $smartTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force)
+                    $tagResult = New-GitTag -TagName $smartTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force
+                    if (-not $tagResult.Success) {
+                        throw "Failed to create smart tag '$($smartTag.Name)': $($tagResult.ErrorMessage)"
+                    }
                 }
                 
                 # 3. Update moving tags (pointing to release tag, suppress output)
                 foreach ($movingTag in $strategy.MovingTagsToUpdate) {
-                    [void](New-GitTag -TagName $movingTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force)
+                    $tagResult = New-GitTag -TagName $movingTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force
+                    if (-not $tagResult.Success) {
+                        throw "Failed to create moving tag '$($movingTag.Name)': $($tagResult.ErrorMessage)"
+                    }
                 }
                 
-                # 4. Push all tags (suppress output)
-                [void](Push-GitTags -RepositoryPath $RepositoryPath)
+                # 4. Push all tags (check for errors)
+                $pushResult = Push-GitTags -RepositoryPath $RepositoryPath
+                if (-not $pushResult.Success) {
+                    throw "Failed to push tags to remote: $($pushResult.ErrorMessage)"
+                }
                 
                 Write-SafeInfoLog -Message "Successfully created semantic release tags" -Additional @{
                     "ReleaseTag" = $normalizedVersion
