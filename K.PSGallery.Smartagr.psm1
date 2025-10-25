@@ -258,6 +258,8 @@ function New-SemanticReleaseTags {
 
                 $smartTagNames = @($strategy.SmartTagsToCreate | ForEach-Object { $_.Name } | Where-Object { $_ })
                 Write-Verbose "SmartTagNames extracted: [$($smartTagNames -join ', ')]"
+                # als json ausgeben
+                Write-Verbose ($smartTagNames | ConvertTo-Json -Depth 3)
                 $allTags += $smartTagNames
             }
             if ($strategy.MovingTagsToUpdate) {
@@ -268,6 +270,7 @@ function New-SemanticReleaseTags {
 
                 $movingTagNames = @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
                 Write-Verbose "MovingTagNames extracted: [$($movingTagNames -join ', ')]"
+                Write-Verbose ($movingTagNames | ConvertTo-Json -Depth 3)
                 $allTags += $movingTagNames
             }
             
