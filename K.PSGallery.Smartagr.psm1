@@ -251,11 +251,21 @@ function New-SemanticReleaseTags {
             Write-Verbose "=== STRATEGY DEBUG END ==="
             
             if ($strategy.SmartTagsToCreate) {
+                # output debug info for smart tags to create strategy.SmartTagsToCreate
+                Write-Verbose "SmartTagsToCreate Count: $($strategy.SmartTagsToCreate.Count)"
+                Write-Verbose "SmartTagsToCreate JSON:"
+                Write-Verbose ($strategy.SmartTagsToCreate | ConvertTo-Json -Depth 3)
+
                 $smartTagNames = @($strategy.SmartTagsToCreate | ForEach-Object { $_.Name } | Where-Object { $_ })
                 Write-Verbose "SmartTagNames extracted: [$($smartTagNames -join ', ')]"
                 $allTags += $smartTagNames
             }
             if ($strategy.MovingTagsToUpdate) {
+                # output debug info for moving tags to update strategy.MovingTagsToUpdate
+                Write-Verbose "MovingTagsToUpdate Count: $($strategy.MovingTagsToUpdate.Count)"
+                Write-Verbose "MovingTagsToUpdate JSON:"
+                Write-Verbose ($strategy.MovingTagsToUpdate | ConvertTo-Json -Depth 3)
+
                 $movingTagNames = @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
                 Write-Verbose "MovingTagNames extracted: [$($movingTagNames -join ', ')]"
                 $allTags += $movingTagNames
