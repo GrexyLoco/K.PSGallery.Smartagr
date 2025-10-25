@@ -213,22 +213,6 @@ jobs:
               Write-Output "   Target: $($result.TargetVersion)"
               Write-Output "   All tags: $($result.AllTags -join ', ')"
               
-              # DEBUG: Output result object structure
-              Write-Output ""
-              Write-Output "=== DEBUG: Result Object Structure ==="
-              Write-Output "Result as JSON:"
-              Write-Output ($result | ConvertTo-Json -Depth 3)
-              Write-Output ""
-              Write-Output "SmartTags type: $($result.SmartTags.GetType().Name)"
-              Write-Output "SmartTags count: $($result.SmartTags.Count)"
-              Write-Output "SmartTags raw: $($result.SmartTags)"
-              Write-Output ""
-              Write-Output "MovingTags type: $($result.MovingTags.GetType().Name)"
-              Write-Output "MovingTags count: $($result.MovingTags.Count)"
-              Write-Output "MovingTags raw: $($result.MovingTags)"
-              Write-Output "======================================="
-              Write-Output ""
-              
               # Format tag lists for summary with markdown backticks
               # Use format operator to avoid YAML escaping issues with double backticks
               $smartTagsList = if ($result.SmartTags.Count -gt 0) { 

@@ -202,6 +202,7 @@ function New-SemanticReleaseTags {
                 "Force" = $Force.IsPresent
             }
             
+            # Suppress validation result output to pipeline
             $validation = Test-TargetVersionValidity -TargetVersion $normalizedVersion -ExistingTags $existingTags -Force:$Force
             
             if (-not $validation.IsValid) {
@@ -214,21 +215,21 @@ function New-SemanticReleaseTags {
             # Execute or preview the strategy
             if ($PSCmdlet.ShouldProcess("Semantic version tags for $normalizedVersion", "Create tags")) {
                 # Create the actual tags
-                # 1. Create release tag
-                New-GitTag -TagName $normalizedVersion -RepositoryPath $RepositoryPath
+                # 1. Create release tag (suppress pipeline output)
+                [void](New-GitTag -TagName $normalizedVersion -RepositoryPath $RepositoryPath)
                 
-                # 2. Create smart tags (pointing to release tag)
+                # 2. Create smart tags (pointing to release tag, suppress output)
                 foreach ($smartTag in $strategy.SmartTagsToCreate) {
-                    New-GitTag -TagName $smartTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force
+                    [void](New-GitTag -TagName $smartTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force)
                 }
                 
-                # 3. Update moving tags (pointing to release tag)
+                # 3. Update moving tags (pointing to release tag, suppress output)
                 foreach ($movingTag in $strategy.MovingTagsToUpdate) {
-                    New-GitTag -TagName $movingTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force
+                    [void](New-GitTag -TagName $movingTag.Name -TargetRef $normalizedVersion -RepositoryPath $RepositoryPath -Force)
                 }
                 
-                # 4. Push all tags
-                Push-GitTags -RepositoryPath $RepositoryPath
+                # 4. Push all tags (suppress output)
+                [void](Push-GitTags -RepositoryPath $RepositoryPath)
                 
                 Write-SafeInfoLog -Message "Successfully created semantic release tags" -Additional @{
                     "ReleaseTag" = $normalizedVersion
