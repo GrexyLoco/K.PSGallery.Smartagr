@@ -240,11 +240,20 @@ function New-SemanticReleaseTags {
             
             # Collect all created/updated tags for result (filter out empty values)
             $allTags = @($normalizedVersion)
-            if ($strategy.SmartTagsToCreate.Name) {
-                $allTags += @($strategy.SmartTagsToCreate.Name | Where-Object { $_ })
+            
+            # DEBUG: Output strategy object as JSON before filtering
+            Write-SafeInfoLog -Message "Strategy object before filtering" -Additional @{
+                "SmartTagsToCreateJSON" = ($strategy.SmartTagsToCreate | ConvertTo-Json -Depth 3 -Compress)
+                "MovingTagsToUpdateJSON" = ($strategy.MovingTagsToUpdate | ConvertTo-Json -Depth 3 -Compress)
+                "SmartTagsToCreateCount" = $strategy.SmartTagsToCreate.Count
+                "MovingTagsToUpdateCount" = $strategy.MovingTagsToUpdate.Count
             }
-            if ($strategy.MovingTagsToUpdate.Name) {
-                $allTags += @($strategy.MovingTagsToUpdate.Name | Where-Object { $_ })
+            
+            if ($strategy.SmartTagsToCreate) {
+                $allTags += @($strategy.SmartTagsToCreate | ForEach-Object { $_.Name } | Where-Object { $_ })
+            }
+            if ($strategy.MovingTagsToUpdate) {
+                $allTags += @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
             }
             
             return @{
