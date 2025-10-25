@@ -246,6 +246,81 @@ Describe "Semantic Version Parsing (Private Functions)" -Tag "Unit", "Private" {
             }
         }
     }
+    
+    Context "Smart Tag Filtering in Get-SemanticVersionTags" {
+        It "Should exclude smart tags (v0, v0.1) and moving tags (latest) from results (Integration Test)" {
+            # Arrange: Use the actual repository root (this is an integration test)
+            $repoRoot = Split-Path $PSScriptRoot -Parent
+            
+            # Act: Get semantic version tags from the actual repository
+            $result = Get-SemanticVersionTags -RepositoryPath $repoRoot
+            
+            # Assert: We should have results (the repo has many semantic version tags)
+            $result | Should -Not -BeNullOrEmpty -Because "The repository has semantic version tags"
+            
+            # Verify: Smart tags should NOT be in the results
+            $result | Should -Not -Contain 'v0' -Because "v0 is a smart tag, not a semantic version"
+            $result | Should -Not -Contain 'v0.1' -Because "v0.1 is a smart tag, not a semantic version"
+            $result | Should -Not -Contain 'latest' -Because "latest is a moving tag, not a semantic version"
+            
+            # Verify: Real semantic versions SHOULD be in the results
+            # (Testing against known tags that exist in the repository)
+            $result | Should -Contain 'v0.1.14' -Because "v0.1.14 is a valid semantic version tag"
+            $result | Should -Contain 'v0.1.13' -Because "v0.1.13 is a valid semantic version tag"
+            $result | Should -Contain 'v0.0.1' -Because "v0.0.1 is a valid semantic version tag"
+            
+            # Verify: All returned values match semantic version pattern
+            foreach ($tag in $result) {
+                $tag | Should -Match '^v?\d+\.\d+\.\d+' -Because "All returned tags should be semantic versions"
+                $tag | Should -Not -Match '^(latest|v\d+|v\d+\.\d+)$' -Because "Smart tags should be excluded"
+            }
+        }
+    }
+}
+
+Describe "Git Operations - Null Value Filtering" -Tag "Unit", "Private" {
+    
+    BeforeEach {
+        # Clean state for each test
+        $Error.Clear()
+    }
+    
+    Context "Null Value Filtering in Get-ExistingSemanticTags" {
+        It "Should filter out invalid tags and return only valid semantic version objects (Integration Test)" {
+            # Arrange: Use the actual repository root
+            $repoRoot = Split-Path $PSScriptRoot -Parent
+            
+            # Act: Get existing semantic tags from the actual repository
+            $result = Get-ExistingSemanticTags -RepositoryPath $repoRoot
+            
+            # Assert: We should have results (the repo has semantic version tags)
+            $result | Should -Not -BeNullOrEmpty -Because "The repository has valid semantic version tags"
+            $result.Count | Should -BeGreaterThan 0 -Because "At least some valid tags should parse successfully"
+            
+            # Verify: All results have valid properties (no null objects)
+            foreach ($tag in $result) {
+                $tag | Should -Not -BeNullOrEmpty -Because "No null entries should exist in result array"
+                $tag.Tag | Should -Not -BeNullOrEmpty -Because "Every tag object must have a Tag property"
+                $tag.Version | Should -Not -BeNullOrEmpty -Because "Every tag object must have a Version property"
+                $tag.PSObject.Properties['Major'] | Should -Not -BeNullOrEmpty -Because "Every tag must have a Major version"
+                $tag.PSObject.Properties['Minor'] | Should -Not -BeNullOrEmpty -Because "Every tag must have a Minor version"
+                $tag.PSObject.Properties['Patch'] | Should -Not -BeNullOrEmpty -Because "Every tag must have a Patch version"
+            }
+            
+            # Verify: Only valid semantic versions are in result (no smart tags)
+            $result.Tag | Should -Not -Contain 'v0' -Because "Smart tags should not parse to valid objects"
+            $result.Tag | Should -Not -Contain 'v0.1' -Because "Smart tags should not parse to valid objects"
+            $result.Tag | Should -Not -Contain 'latest' -Because "Moving tags should not parse to valid objects"
+            
+            # Verify: Known valid semantic versions ARE in result
+            $result.Tag | Should -Contain 'v0.1.14' -Because "v0.1.14 is a valid semantic version"
+            $result.Tag | Should -Contain 'v0.0.1' -Because "v0.0.1 is a valid semantic version"
+            
+            # Verify: Null values are NOT in the array (defense-in-depth check)
+            $result | Where-Object { $_ -eq $null } | Should -BeNullOrEmpty -Because "Null filtering should remove all null values"
+            $result | Where-Object { $_.Tag -eq $null } | Should -BeNullOrEmpty -Because "No tag should have null Tag property"
+        }
+    }
 }
 
 Describe "Version Validation (Private Functions)" -Tag "Unit", "Private" {

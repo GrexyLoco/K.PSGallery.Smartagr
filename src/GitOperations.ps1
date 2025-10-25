@@ -139,13 +139,15 @@ function Get-ExistingSemanticTags {
         
         Write-SafeInfoLog "Filtered semantic version tags" -Context "SemanticTagCount: $($semanticTags.Count)`nTotalTagCount: $($allTags.Count)"
         
-        $tagObjects = foreach ($tag in $semanticTags) {
-            $parsed = ConvertTo-SemanticVersionObject -TagName $tag
+        # Parse and filter out null values (failed parsing)
+        $tagObjects = $semanticTags | ForEach-Object {
+            $parsed = ConvertTo-SemanticVersionObject -TagName $_
             if ($parsed) {
-                Write-SafeDebugLog "Successfully parsed semantic tag" -Context "Tag: $tag`nVersion: $($parsed.Version)"
+                Write-SafeDebugLog "Successfully parsed semantic tag" -Context "Tag: $_`nVersion: $($parsed.Version)"
                 $parsed
             }
-        }
+            # Implicitly: if $parsed is $null, nothing is added to the array
+        } | Where-Object { $_ -ne $null }  # Extra safety: filter out any nulls
         
         $sortedTags = $tagObjects | Sort-Object { $_.Version } -Descending
         Write-SafeInfoLog "Semantic tags retrieved and sorted successfully" -Context "FinalCount: $($sortedTags.Count)"
@@ -461,17 +463,36 @@ function Get-SemanticVersionTags {
     
     Write-SafeDebugLog -Message "Getting all semantic version tags" -Additional @{ "RepositoryPath" = $RepositoryPath }
     
-    $allTags = Get-GitTags -RepositoryPath $RepositoryPath
-    
-    $semanticTags = $allTags | ForEach-Object {
-        if (Test-IsValidSemanticVersion -Version $_) {
-            $_
+    try {
+        Push-Location $RepositoryPath
+        
+        # Get all tags from repository
+        $allTags = git tag -l 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $allTags) {
+            Write-SafeInfoLog -Message "No tags found in repository"
+            return @()
         }
+        
+        # Filter for semantic version tags only (exclude smart tags like v0, v0.1, latest)
+        $semanticTags = $allTags | Where-Object {
+            # Must have full semantic version format (v0.0.0 with optional pre-release/build)
+            $_ -match '^v?\d+\.\d+\.\d+' -and
+            # Exclude smart tags (v0, v0.1) and moving tags (latest)
+            $_ -notmatch '^(latest|v\d+|v\d+\.\d+)$'
+        } | ForEach-Object {
+            # Additional validation with Test-IsValidSemanticVersion
+            if (Test-IsValidSemanticVersion -Version $_) {
+                $_
+            }
+        } | Where-Object { $_ }  # Filter out any null values
+        
+        Write-SafeInfoLog -Message "Found $($semanticTags.Count) semantic version tags" -Additional @{ "TotalTags" = $allTags.Count }
+        
+        return $semanticTags
     }
-    
-    Write-SafeInfoLog -Message "Found $($semanticTags.Count) semantic version tags" -Additional @{ "TotalTags" = $allTags.Count }
-    
-    return $semanticTags
+    finally {
+        Pop-Location
+    }
 }
 
 <#
