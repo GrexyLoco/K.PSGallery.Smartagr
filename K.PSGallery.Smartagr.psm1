@@ -25,9 +25,6 @@
     This module follows semantic versioning principles as defined at https://semver.org/
 #>
 
-$moduleVersion = (Get-Content -Path "$PSScriptRoot\K.PSGallery.Smartagr.psd1" | Where-Object { $_ -match 'ModuleVersion' } | ForEach-Object { $_ -replace '.*=\s*''([^'']+)''', '$1' })
-Write-Information "Current K.PSGallery.Smartagr module version: $moduleVersion"
-
 #region Module Initialization
 
 Write-Information "Loading K.PSGallery.Smartagr module.."
@@ -64,6 +61,8 @@ if (-not (Get-Command 'Write-SafeInfoLog' -ErrorAction SilentlyContinue)) {
 }
 
 Write-SafeInfoLog -Message "K.PSGallery.Smartagr module initialization started"
+$moduleVersion = (Get-Content -Path "$PSScriptRoot\K.PSGallery.Smartagr.psd1" | Where-Object { $_ -match 'ModuleVersion' } | ForEach-Object { $_ -replace '.*=\s*''([^'']+)''', '$1' })
+Write-Information "Current K.PSGallery.Smartagr module version: $moduleVersion"
 
 # Load all other PowerShell files from the src directory (SafeLogging.ps1 already loaded via ScriptsToProcess)
 $srcPath = Join-Path $PSScriptRoot "src"
