@@ -213,14 +213,15 @@ jobs:
               Write-Output "   Target: $($result.TargetVersion)"
               Write-Output "   All tags: $($result.AllTags -join ', ')"
               
-              # Format tag lists for summary (handle empty arrays)
+              # Format tag lists for summary with markdown backticks
+              # Use format operator to avoid YAML escaping issues with double backticks
               $smartTagsList = if ($result.SmartTags.Count -gt 0) { 
-                ($result.SmartTags | ForEach-Object { "``$_``" }) -join ', ' 
+                ($result.SmartTags | ForEach-Object { '`{0}`' -f $_ }) -join ', '
               } else { 
                 "_(none)_" 
               }
               $movingTagsList = if ($result.MovingTags.Count -gt 0) { 
-                ($result.MovingTags | ForEach-Object { "``$_``" }) -join ', ' 
+                ($result.MovingTags | ForEach-Object { '`{0}`' -f $_ }) -join ', '
               } else { 
                 "_(none)_" 
               }

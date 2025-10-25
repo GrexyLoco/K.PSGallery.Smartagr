@@ -241,40 +241,35 @@ function New-SemanticReleaseTags {
             $allTags = @($normalizedVersion)
             
             # DEBUG: Output strategy object details BEFORE filtering
-            Write-Verbose "=== STRATEGY DEBUG START ==="
-            Write-Verbose "SmartTagsToCreate Count: $($strategy.SmartTagsToCreate.Count)"
-            Write-Verbose "SmartTagsToCreate JSON:"
-            Write-Verbose ($strategy.SmartTagsToCreate | ConvertTo-Json -Depth 3)
-            Write-Verbose "MovingTagsToUpdate Count: $($strategy.MovingTagsToUpdate.Count)"
-            Write-Verbose "MovingTagsToUpdate JSON:"
-            Write-Verbose ($strategy.MovingTagsToUpdate | ConvertTo-Json -Depth 3)
-            Write-Verbose "=== STRATEGY DEBUG END ==="
+            Write-SafeDebugLog -Message "=== STRATEGY DEBUG START ===" -Additional @{
+                "SmartTagsCount" = $strategy.SmartTagsToCreate.Count
+                "MovingTagsCount" = $strategy.MovingTagsToUpdate.Count
+            }
+            Write-SafeDebugLog -Message "SmartTagsToCreate JSON" -Additional @{
+                "SmartTags" = ($strategy.SmartTagsToCreate | ConvertTo-Json -Depth 3)
+            }
+            Write-SafeDebugLog -Message "MovingTagsToUpdate JSON" -Additional @{
+                "MovingTags" = ($strategy.MovingTagsToUpdate | ConvertTo-Json -Depth 3)
+            }
             
             if ($strategy.SmartTagsToCreate) {
-                # output debug info for smart tags to create strategy.SmartTagsToCreate
-                Write-Verbose "SmartTagsToCreate Count: $($strategy.SmartTagsToCreate.Count)"
-                Write-Verbose "SmartTagsToCreate JSON:"
-                Write-Verbose ($strategy.SmartTagsToCreate | ConvertTo-Json -Depth 3)
-
                 $smartTagNames = @($strategy.SmartTagsToCreate | ForEach-Object { $_.Name } | Where-Object { $_ })
-                Write-Verbose "SmartTagNames extracted: [$($smartTagNames -join ', ')]"
-                # als json ausgeben
-                Write-Verbose ($smartTagNames | ConvertTo-Json -Depth 3)
+                Write-SafeDebugLog -Message "SmartTagNames extracted" -Additional @{
+                    "Tags" = ($smartTagNames -join ', ')
+                }
                 $allTags += $smartTagNames
             }
             if ($strategy.MovingTagsToUpdate) {
-                # output debug info for moving tags to update strategy.MovingTagsToUpdate
-                Write-Verbose "MovingTagsToUpdate Count: $($strategy.MovingTagsToUpdate.Count)"
-                Write-Verbose "MovingTagsToUpdate JSON:"
-                Write-Verbose ($strategy.MovingTagsToUpdate | ConvertTo-Json -Depth 3)
-
                 $movingTagNames = @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
-                Write-Verbose "MovingTagNames extracted: [$($movingTagNames -join ', ')]"
-                Write-Verbose ($movingTagNames | ConvertTo-Json -Depth 3)
+                Write-SafeDebugLog -Message "MovingTagNames extracted" -Additional @{
+                    "Tags" = ($movingTagNames -join ', ')
+                }
                 $allTags += $movingTagNames
             }
             
-            Write-Verbose "AllTags final: [$($allTags -join ', ')]"
+            Write-SafeDebugLog -Message "AllTags final" -Additional @{
+                "AllTags" = ($allTags -join ', ')
+            }
             
             return @{
                 Success = $true
@@ -300,16 +295,13 @@ function New-SemanticReleaseTags {
         }
         
         # CRITICAL: Output error to console for visibility in CI/CD logs
-        Write-Warning "=== SMARTAGR TAG CREATION FAILED ==="
-        Write-Warning "Target Version: $TargetVersion"
-        Write-Warning "Error: $($_.Exception.Message)"
-        Write-Warning "Type: $($_.Exception.GetType().FullName)"
-        if ($_.Exception.InnerException) {
-            Write-Warning "Inner Exception: $($_.Exception.InnerException.Message)"
+        Write-SafeWarningLog -Message "SMARTAGR TAG CREATION FAILED" -Additional @{
+            "TargetVersion" = $TargetVersion
+            "Error" = $_.Exception.Message
+            "ErrorType" = $_.Exception.GetType().FullName
+            "InnerException" = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $null }
+            "StackTrace" = $_.ScriptStackTrace
         }
-        Write-Warning "Stack Trace:"
-        Write-Warning "$($_.ScriptStackTrace)"
-        Write-Warning "===================================="
         
         # For validation errors (ArgumentException), rethrow to allow proper error handling
         if ($_.Exception -is [System.ArgumentException] -or $_.Exception.Message -match "Invalid semantic version format") {
