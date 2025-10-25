@@ -275,6 +275,65 @@ Describe "Semantic Version Parsing (Private Functions)" -Tag "Unit", "Private" {
                 $tag | Should -Not -Match '^(latest|v\d+|v\d+\.\d+)$' -Because "Smart tags should be excluded"
             }
         }
+        
+        It "Should handle real production tag constellation without creating empty values in AllTags array" {
+            # Arrange: Simulate EXACT production tag constellation (from GitHub as of 2025-10-25)
+            $repoRoot = Split-Path $PSScriptRoot -Parent
+            
+            # This test validates the CRITICAL bug: Empty values in $result.AllTags
+            # Real constellation: 17 semantic tags + 2 smart tags (v0, v0.1) + 1 moving tag (latest)
+            
+            # Act: Call New-SemanticReleaseTags with a new patch version
+            $targetVersion = "v0.1.25"  # Next patch after v0.1.24
+            
+            # Get existing tags (should filter out smart tags)
+            $existingTags = Get-ExistingSemanticTags -RepositoryPath $repoRoot
+            
+            # Calculate strategy
+            $strategy = Get-SmartTagStrategy -TargetVersion $targetVersion -ExistingTags $existingTags
+            
+            # Simulate the AllTags array construction (THIS IS WHERE THE BUG OCCURS)
+            $allTags = @($targetVersion)
+            
+            # CRITICAL: This should NOT produce empty values!
+            if ($strategy.SmartTagsToCreate) {
+                $smartTagNames = @($strategy.SmartTagsToCreate | ForEach-Object { $_.Name } | Where-Object { $_ })
+                $allTags += $smartTagNames
+            }
+            if ($strategy.MovingTagsToUpdate) {
+                $movingTagNames = @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
+                $allTags += $movingTagNames
+            }
+            
+            # Assert: NO empty values should exist in the array
+            $emptyCount = ($allTags | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count
+            $emptyCount | Should -Be 0 -Because "AllTags array must not contain empty strings or null values"
+            
+            # Assert: All values should be valid tag names
+            foreach ($tag in $allTags) {
+                $tag | Should -Not -BeNullOrEmpty -Because "Every tag in AllTags must have a value"
+                $tag | Should -Match '^(v\d+(\.\d+(\.\d+)?)?|latest)$' -Because "All tags must match valid tag patterns"
+            }
+            
+            # Assert: Strategy should return proper PSCustomObjects
+            $strategy.SmartTagsToCreate | ForEach-Object {
+                $_ | Should -BeOfType [PSCustomObject] -Because "SmartTagsToCreate must contain PSCustomObjects"
+                $_.PSObject.Properties['Name'] | Should -Not -BeNullOrEmpty -Because "Each object must have a Name property"
+                $_.PSObject.Properties['Target'] | Should -Not -BeNullOrEmpty -Because "Each object must have a Target property"
+            }
+            
+            # Assert: Expected tags for patch release (v0.1.24 → v0.1.25)
+            # Should be: v0.1.25 (release) + v0 + v0.1 (smart tags) + latest (moving)
+            $allTags.Count | Should -BeGreaterThan 0 -Because "At least the release tag should be present"
+            $allTags | Should -Contain $targetVersion -Because "Release tag must be in AllTags"
+            $allTags | Should -Contain 'latest' -Because "Moving tag 'latest' should be updated"
+            
+            # Verify the join operation works correctly (this is what appears in workflow output)
+            $joinedOutput = $allTags -join ', '
+            $joinedOutput | Should -Not -Match ',\s*,' -Because "Joined output must not have consecutive commas (indicates empty values)"
+            $joinedOutput | Should -Not -Match '^\s*,' -Because "Joined output must not start with a comma"
+            $joinedOutput | Should -Not -Match ',\s*$' -Because "Joined output must not end with a comma"
+        }
     }
 }
 

@@ -241,20 +241,28 @@ function New-SemanticReleaseTags {
             # Collect all created/updated tags for result (filter out empty values)
             $allTags = @($normalizedVersion)
             
-            # DEBUG: Output strategy object as JSON before filtering
-            Write-SafeInfoLog -Message "Strategy object before filtering" -Additional @{
-                "SmartTagsToCreateJSON" = ($strategy.SmartTagsToCreate | ConvertTo-Json -Depth 3 -Compress)
-                "MovingTagsToUpdateJSON" = ($strategy.MovingTagsToUpdate | ConvertTo-Json -Depth 3 -Compress)
-                "SmartTagsToCreateCount" = $strategy.SmartTagsToCreate.Count
-                "MovingTagsToUpdateCount" = $strategy.MovingTagsToUpdate.Count
-            }
+            # DEBUG: Output strategy object details BEFORE filtering
+            Write-Host "=== STRATEGY DEBUG START ===" -ForegroundColor Cyan
+            Write-Host "SmartTagsToCreate Count: $($strategy.SmartTagsToCreate.Count)" -ForegroundColor Yellow
+            Write-Host "SmartTagsToCreate JSON:" -ForegroundColor Yellow
+            Write-Host ($strategy.SmartTagsToCreate | ConvertTo-Json -Depth 3) -ForegroundColor Gray
+            Write-Host "MovingTagsToUpdate Count: $($strategy.MovingTagsToUpdate.Count)" -ForegroundColor Yellow
+            Write-Host "MovingTagsToUpdate JSON:" -ForegroundColor Yellow
+            Write-Host ($strategy.MovingTagsToUpdate | ConvertTo-Json -Depth 3) -ForegroundColor Gray
+            Write-Host "=== STRATEGY DEBUG END ===" -ForegroundColor Cyan
             
             if ($strategy.SmartTagsToCreate) {
-                $allTags += @($strategy.SmartTagsToCreate | ForEach-Object { $_.Name } | Where-Object { $_ })
+                $smartTagNames = @($strategy.SmartTagsToCreate | ForEach-Object { $_.Name } | Where-Object { $_ })
+                Write-Host "SmartTagNames extracted: [$($smartTagNames -join ', ')]" -ForegroundColor Magenta
+                $allTags += $smartTagNames
             }
             if ($strategy.MovingTagsToUpdate) {
-                $allTags += @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
+                $movingTagNames = @($strategy.MovingTagsToUpdate | ForEach-Object { $_.Name } | Where-Object { $_ })
+                Write-Host "MovingTagNames extracted: [$($movingTagNames -join ', ')]" -ForegroundColor Magenta
+                $allTags += $movingTagNames
             }
+            
+            Write-Host "AllTags final: [$($allTags -join ', ')]" -ForegroundColor Green
             
             return @{
                 Success = $true
