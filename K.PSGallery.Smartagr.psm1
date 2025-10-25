@@ -26,11 +26,11 @@
 #>
 
 $moduleVersion = (Get-Content -Path "$PSScriptRoot\K.PSGallery.Smartagr.psd1" | Where-Object { $_ -match 'ModuleVersion' } | ForEach-Object { $_ -replace '.*=\s*''([^'']+)''', '$1' })
-Write-Verbose "Current K.PSGallery.Smartagr module version: $moduleVersion"
+Write-InfoLog "Current K.PSGallery.Smartagr module version: $moduleVersion"
 
 #region Module Initialization
 
-Write-Verbose "Loading K.PSGallery.Smartagr module..."
+Write-InfoLog "Loading K.PSGallery.Smartagr module..."
 
 # Try to ensure LoggingModule is available for structured logging
 try {
