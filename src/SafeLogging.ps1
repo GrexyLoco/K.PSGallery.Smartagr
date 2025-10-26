@@ -78,3 +78,31 @@ function Write-SafeDebugLog {
         }
     }
 }
+
+# Compatibility wrapper for GitHubReleaseManagement.ps1
+# which uses Write-SafeLog with level parameter
+function Write-SafeLog {
+    param(
+        [Parameter(Mandatory, Position=0)]
+        [ValidateSet("INFO", "WARN", "ERROR", "DEBUG")]
+        [string]$Level,
+        
+        [Parameter(Mandatory, Position=1)]
+        [string]$Message,
+        
+        [Parameter(Position=2)]
+        [string]$Context = ""
+    )
+    
+    $additional = @{}
+    if ($Context) {
+        $additional["Context"] = $Context
+    }
+    
+    switch ($Level) {
+        "INFO"  { Write-SafeInfoLog -Message $Message -Additional $additional }
+        "WARN"  { Write-SafeWarningLog -Message $Message -Additional $additional }
+        "ERROR" { Write-SafeErrorLog -Message $Message -Additional $additional }
+        "DEBUG" { Write-SafeDebugLog -Message $Message -Additional $additional }
+    }
+}

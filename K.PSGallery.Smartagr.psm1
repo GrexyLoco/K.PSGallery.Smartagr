@@ -346,9 +346,12 @@ function New-SemanticReleaseTags {
     Creates a new Smart Release with automated version calculation and tag management
 
 .DESCRIPTION
-    New-SmartRelease automatically determines the next appropriate semantic version based on
+    New-AutoVersionRelease automatically determines the next appropriate semantic version based on
     existing tags and release type, then creates all necessary tags with smart tag management.
     This function combines version calculation with tag creation for streamlined releases.
+    
+    NOTE: This function is deprecated. Use New-SmartRelease from GitHubReleaseManagement.ps1 for
+    full GitHub Release integration with the Draft → Tags → Publish workflow.
 
 .PARAMETER ReleaseType
     The type of release to create: Major, Minor, or Patch
@@ -371,15 +374,15 @@ function New-SemanticReleaseTags {
     Useful for previewing the release strategy
 
 .EXAMPLE
-    New-SmartRelease -ReleaseType Minor
+    New-AutoVersionRelease -ReleaseType Minor
     Creates the next minor version (e.g., v1.1.0 if current is v1.0.3)
 
 .EXAMPLE
-    New-SmartRelease -ReleaseType Major -PreReleaseLabel "alpha"
+    New-AutoVersionRelease -ReleaseType Major -PreReleaseLabel "alpha"
     Creates the next major pre-release (e.g., v2.0.0-alpha)
 
 .EXAMPLE
-    New-SmartRelease -ReleaseType Patch -WhatIf
+    New-AutoVersionRelease -ReleaseType Patch -WhatIf
     Shows what patch version would be created
 
 .NOTES
@@ -387,8 +390,9 @@ function New-SemanticReleaseTags {
     - Follows semantic versioning principles for version progression
     - Integrates with New-SemanticReleaseTags for complete tag management
     - Supports pre-release versions with custom labels
+    - DEPRECATED: Use New-SmartRelease for GitHub Release integration
 #>
-function New-SmartRelease {
+function New-AutoVersionRelease {
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory = $true)]
