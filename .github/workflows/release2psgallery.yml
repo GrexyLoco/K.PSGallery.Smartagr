@@ -172,8 +172,8 @@ jobs:
       #       echo "✅ Tag v${{ steps.version.outputs.newVersion }} successfully created"
       #     fi
 
-      # DISABLED: Smartagr-based tagging (will be re-enabled after next publish)
-      - name: 🏷️ Create semantic release tags with Smartagr 
+      # Smart Release: Complete release management with Draft → Tags → Publish workflow
+      - name: 🚀 Create GitHub Release and semantic tags with Smartagr 
         if: steps.version.outputs.newVersion != ''
         shell: pwsh
         run: |
@@ -195,48 +195,76 @@ jobs:
             Import-Module "${{ github.workspace }}/K.PSGallery.Smartagr.psd1" -Force -Verbose
           }
           
-          # 🏷️ Create semantic release tags (base + smart tags)
-          Write-Output "🏷️ Creating semantic release tags for v${{ steps.version.outputs.newVersion }}..."
+          # 🏷️ Create semantic release tags (base + smart tags) and GitHub Release
+          Write-Output "🚀 Creating smart release (Draft → Tags → Publish) for v${{ steps.version.outputs.newVersion }}..."
           
           $targetVersion = "v${{ steps.version.outputs.newVersion }}"
           $repoPath = "${{ github.workspace }}"
+          
+          # Generate release notes
+          $releaseNotes = @"
+          ## 🎉 Release $targetVersion
+          
+          > **${{ steps.version.outputs.bumpType }}** release
+          
+          ### 📦 Installation
+          ``````powershell
+          Install-Module -Name K.PSGallery.Smartagr -RequiredVersion ${{ steps.version.outputs.newVersion }}
+          ``````
+          
+          ### 🏷️ Version Tags
+          | Tag | Purpose | Auto-Updates |
+          |-----|---------|--------------|
+          | ``@latest`` | Always newest | ✅ Every release |
+          | ``@$targetVersion`` | This exact version | ❌ Pinned forever |
+          "@
           
           # Ensure errors are caught
           $ErrorActionPreference = 'Stop'
           
           try {
-            $result = New-SemanticReleaseTags `
+            $result = New-SmartRelease `
               -TargetVersion $targetVersion `
               -RepositoryPath $repoPath `
+              -ReleaseNotes $releaseNotes `
+              -PushToRemote `
               -Verbose
             
             if ($result.Success) {
-              Write-Output $result.Message
+              Write-Output "✅ Smart release created successfully"
               Write-Output "   Target: $($result.TargetVersion)"
-              Write-Output "   All tags: $($result.AllTags -join ', ')"
+              Write-Output "   Release URL: $($result.ReleaseUrl)"
+              Write-Output "   Tags Created: $($result.TagsCreated -join ', ')"
               
               # Format tag lists for summary with markdown backticks
               # Use format operator to avoid YAML escaping issues with double backticks
-              $smartTagsList = if ($result.SmartTags.Count -gt 0) { 
-                ($result.SmartTags | ForEach-Object { '`{0}`' -f $_ }) -join ', '
+              $releaseTag = if ($result.GitTagsResult.ReleaseTag) { 
+                '`{0}`' -f $result.GitTagsResult.ReleaseTag
+              } else { 
+                '`{0}`' -f $targetVersion
+              }
+              $smartTagsList = if ($result.GitTagsResult.SmartTags.Count -gt 0) { 
+                ($result.GitTagsResult.SmartTags | ForEach-Object { '`{0}`' -f $_ }) -join ', '
               } else { 
                 "_(none)_" 
               }
-              $movingTagsList = if ($result.MovingTags.Count -gt 0) { 
-                ($result.MovingTags | ForEach-Object { '`{0}`' -f $_ }) -join ', '
+              $movingTagsList = if ($result.GitTagsResult.MovingTags.Count -gt 0) { 
+                ($result.GitTagsResult.MovingTags | ForEach-Object { '`{0}`' -f $_ }) -join ', '
               } else { 
                 "_(none)_" 
               }
               
               # 📝 Add summary to GitHub Actions UI
               @"
-          ## 🏷️ Semantic Tag Management (Smartagr)
+          ## 🏷️ Semantic Tag Management + GitHub Release
           
           **Target Version:** ``$($result.TargetVersion)``
           **Bump Type:** ``${{ steps.version.outputs.bumpType }}``
+          **Release Status:** $(if($result.ReleasePublished){'✅ Published'}elseif($result.ReleaseDraftCreated){'📦 Draft'}else{'❌ Failed'})
+          **Release URL:** [$($result.TargetVersion)]($($result.ReleaseUrl))
           
           ### ✅ Tags Created
-          - **Release Tag:** ``$($result.ReleaseTag)``
+          - **Release Tag:** $releaseTag
           - **Smart Tags:** $smartTagsList
           - **Moving Tags:** $movingTagsList
           
@@ -245,12 +273,17 @@ jobs:
           - Moving tags always point to newest stable version
           - Major/Minor tags enable flexible version pinning
           
+          ### 🚀 GitHub Release
+          - Draft created: $(if($result.ReleaseDraftCreated){'✅ Yes'}else{'❌ No'})
+          - Published: $(if($result.ReleasePublished){'✅ Yes'}else{'❌ No'})
+          - Prerelease: $(if($result.IsPrerelease){'🧪 Yes'}else{'🚀 No'})
+          
           ---
           *Powered by [K.PSGallery.Smartagr](https://www.powershellgallery.com/packages/K.PSGallery.Smartagr)*
           "@ >> $env:GITHUB_STEP_SUMMARY
               
             } else {
-              throw "Semantic tag creation failed: $($result.Message)"
+              throw "Smart release creation failed: Check workflow logs for details"
             }
           }
           catch {
