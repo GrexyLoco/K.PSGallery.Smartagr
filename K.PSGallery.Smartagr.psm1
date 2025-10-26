@@ -237,8 +237,8 @@ function New-SemanticReleaseTags {
                     }
                 }
                 
-                # 4. Push all tags (check for errors)
-                $pushResult = Push-GitTags -RepositoryPath $RepositoryPath
+                # 4. Push all tags (force push required for moving tags)
+                $pushResult = Push-GitTags -RepositoryPath $RepositoryPath -Force
                 if (-not $pushResult.Success) {
                     throw "Failed to push tags to remote: $($pushResult.ErrorMessage)"
                 }
