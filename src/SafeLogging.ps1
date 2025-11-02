@@ -16,7 +16,7 @@ function Write-SafeInfoLog {
         Write-Output "[INFO] - $Message"
         if ($Additional.Count -gt 0) {
             $Additional.GetEnumerator() | ForEach-Object {
-                Write-Output "         ▶ $($_.Key): $($_.Value)"
+                Write-Output "         | $($_.Key): $($_.Value)"
             }
         }
     }
@@ -35,7 +35,7 @@ function Write-SafeWarningLog {
         Write-Warning "$Message"
         if ($Additional.Count -gt 0) {
             $Additional.GetEnumerator() | ForEach-Object {
-                Write-Warning "  ▶ $($_.Key): $($_.Value)"
+                Write-Warning "  | $($_.Key): $($_.Value)"
             }
         }
     }
@@ -54,7 +54,7 @@ function Write-SafeErrorLog {
         Write-Error "$Message"
         if ($Additional.Count -gt 0) {
             $Additional.GetEnumerator() | ForEach-Object {
-                Write-Error "  ▶ $($_.Key): $($_.Value)"
+                Write-Error "  | $($_.Key): $($_.Value)"
             }
         }
     }
@@ -73,7 +73,7 @@ function Write-SafeDebugLog {
         Write-Verbose "[DEBUG] - $Message"
         if ($Additional.Count -gt 0) {
             $Additional.GetEnumerator() | ForEach-Object {
-                Write-Verbose "         ▶ $($_.Key): $($_.Value)"
+                Write-Verbose "         | $($_.Key): $($_.Value)"
             }
         }
     }
