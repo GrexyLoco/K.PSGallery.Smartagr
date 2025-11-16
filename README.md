@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/github/license/GrexyLoco/K.PSGallery.Smartagr)](https://github.com/GrexyLoco/K.PSGallery.Smartagr/blob/master/LICENSE)
 [![CI/CD](https://img.shields.io/github/actions/workflow/status/GrexyLoco/K.PSGallery.Smartagr/check_and_dispatch.yml?branch=master&label=CI%2FCD&logo=github)](https://github.com/GrexyLoco/K.PSGallery.Smartagr/actions)
 
-**Smartagr**: Smart Git tag management with semantic versioning intelligence. The smart tag aggregator that automates creation and management of semantic version tags with intelligent strategies for major, minor, and patch releases.
+**Smartagr**: Smart Git tag management with semantic versioning intelligence and GitHub Release automation. The smart tag aggregator that automates creation and management of semantic version tags with intelligent strategies for major, minor, and patch releases, plus integrated GitHub Release creation with a safe Draft → Tags → Publish workflow.
 
 ---
 
@@ -46,7 +46,10 @@
 # Import the module
 Import-Module K.PSGallery.Smartagr
 
-# Create tags for a new release
+# Create a complete release with GitHub Release + Smart Tags (recommended)
+New-SmartRelease -TargetVersion "v1.2.0" -PushToRemote -Verbose
+
+# Or create only Git tags (no GitHub Release)
 New-SemanticReleaseTags -TargetVersion "v1.2.0" -RepositoryPath "C:\MyRepo" -Verbose
 
 # Get all semantic version tags
@@ -68,8 +71,77 @@ Import-Module ./K.PSGallery.Smartagr.psd1
 
 ## 💡 Core Functions
 
+### `New-SmartRelease`
+Creates a complete semantic release with Git tags and GitHub Release using the proven **Draft → Smart Tags → Publish** workflow.
+
+```powershell
+# Create complete release with GitHub Release and smart tags
+New-SmartRelease -TargetVersion "v1.2.0" -PushToRemote
+
+# Create release with custom notes
+$releaseNotes = @"
+## 🎉 Release v1.2.0
+- Feature: Added new functionality
+- Fix: Resolved issue #123
+"@
+New-SmartRelease -TargetVersion "v1.2.0" -ReleaseNotes $releaseNotes -PushToRemote
+
+# Create release from notes file
+New-SmartRelease -TargetVersion "v1.5.0" -ReleaseNotesFile "CHANGELOG.md" -PushToRemote
+
+# Create only tags without GitHub Release
+New-SmartRelease -TargetVersion "v2.0.0" -SkipGitHubRelease -PushToRemote
+```
+
+**Example Output:**
+```
+Starting smart release creation for v1.2.0
+Step 1: Creating GitHub draft release
+✓ Draft release created successfully (ReleaseId: 12345678)
+Step 2: Creating smart tags
+✓ Created tag: v1.2.0
+✓ Created smart tag: v1.2 (pointing to v1.2.0)
+✓ Created smart tag: v1 (pointing to v1.2.0)
+✓ Updated smart tag: latest (pointing to v1.2.0)
+Step 3: Publishing GitHub release
+✅ Release published successfully
+🔗 Release URL: https://github.com/owner/repo/releases/tag/v1.2.0
+```
+
+**Safe Workflow Strategy:**
+1. **Draft Release**: Creates GitHub Release as DRAFT (safe, reversible)
+2. **Smart Tags**: Creates tags only if Draft successful
+3. **Publish Release**: Publishes only if Smart Tags successful
+
+**Parameters:**
+- `TargetVersion`: Semantic version for the release (e.g., "v1.2.0", "1.2.3-beta")
+- `RepositoryPath`: Path to Git repository (defaults to current directory)
+- `ReleaseNotes`: Custom release notes text
+- `ReleaseNotesFile`: Path to file containing release notes
+- `PushToRemote`: Push created tags to remote repository
+- `SkipGitHubRelease`: Only create Git tags, skip GitHub release creation
+- `Force`: Override duplicate version checks
+
+**Return Object:**
+The function returns a comprehensive PSCustomObject with:
+- `Success`: Overall operation success status
+- `TargetVersion`: The version that was released
+- `ReleaseUrl`: URL to the GitHub Release
+- `ReleasePublished`: Whether release was published (vs draft)
+- `TagsCreated`: Array of all tags created
+- `TagsMovedFrom`: Hashtable of tags that were moved
+- `StepResults`: Detailed status of each workflow step
+- `RollbackInfo`: Information for manual rollback if needed
+- `GitHubSummary`: Formatted markdown summary for CI/CD
+- `Duration`: Total operation duration
+
+**Requirements:**
+- GitHub CLI (`gh`) installed and authenticated (for GitHub Release features)
+- Repository must be hosted on GitHub (for GitHub Release features)
+- Git CLI available in PATH
+
 ### `New-SemanticReleaseTags`
-Creates semantic version tags with smart tag intelligence.
+Creates semantic version tags with smart tag intelligence (Git tags only, no GitHub Release).
 
 ```powershell
 New-SemanticReleaseTags -TargetVersion "v1.2.0" -RepositoryPath "C:\MyRepo"
@@ -100,6 +172,8 @@ Creating semantic release tags for version: v1.2.0
 - `alpha` - Early development versions (e.g., "v1.0.0-alpha", "v1.0.0-alpha.1")
 - `beta` - Feature-complete but potentially unstable (e.g., "v1.0.0-beta", "v1.0.0-beta.2")  
 - `rc` - Release candidates ready for production (e.g., "v1.0.0-rc", "v1.0.0-rc.1")
+
+**Note:** This function only creates Git tags. For complete release management with GitHub Releases, use `New-SmartRelease` instead.
 
 ### `Get-SemanticVersionTags`
 Retrieves and analyzes semantic version tags.
@@ -155,45 +229,6 @@ v2.1.0     2.1.0      False        {v2.1, v2, latest}
 **Parameters:**
 - `RepositoryPath`: Path to Git repository
 - `IncludePreRelease`: Include pre-release versions in search
-
-### `New-GitHubRelease`
-Creates GitHub Releases with automatic tag creation and smart release notes.
-
-```powershell
-# Create release with smart tags
-New-GitHubRelease -Version "v1.2.0" -CreateTags -PushTags
-
-# Create draft pre-release
-New-GitHubRelease -Version "v2.0.0-alpha.1" -Draft -CreateTags
-
-# Create release with custom notes
-New-GitHubRelease -Version "v1.5.0" -ReleaseNotesFile "CHANGELOG.md" -CreateTags
-```
-
-**Example Output:**
-```
-Creating GitHub release v1.2.0 with smart tags
-✓ Created tag: v1.2.0
-✓ Created smart tag: v1.2 (pointing to v1.2.0)
-✓ Created smart tag: v1 (pointing to v1.2.0)
-✓ Updated smart tag: latest (pointing to v1.2.0)
-✅ GitHub Release created: v1.2.0
-🔗 Release URL: https://github.com/owner/repo/releases/tag/v1.2.0
-```
-
-**Parameters:**
-- `Version`: Semantic version for the release
-- `CreateTags`: Also create smart tags with New-SemanticReleaseTags
-- `PushTags`: Push created tags to remote repository
-- `Draft`: Create as draft release
-- `Prerelease`: Mark as prerelease (auto-detected from version)
-- `ReleaseNotes`: Custom release notes text
-- `ReleaseNotesFile`: Path to file containing release notes
-- `GenerateNotes`: Use GitHub's automatic release notes generation
-
-**Requirements:**
-- GitHub CLI (`gh`) installed and authenticated
-- Repository must be hosted on GitHub
 
 ## 🔧 Advanced Configuration
 
@@ -280,6 +315,7 @@ K.PSGallery.Smartagr/
 
 - **PowerShell 7.0+**: Modern PowerShell with enhanced semantic versioning support
 - **Git CLI**: Available in PATH for repository operations
+- **GitHub CLI (`gh`)**: Required for GitHub Release features (optional for tag-only operations)
 - **Pester 5+**: For running tests (development only)
 
 ## 🧪 Testing
@@ -387,7 +423,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📊 Changelog
 
-### v1.0.0
+### v0.1.40 (Current)
+- ✨ Added `New-SmartRelease` for complete GitHub Release + Git tag management
+- 🎯 Draft → Smart Tags → Publish workflow for safe releases
+- 🔧 Comprehensive rollback support and status reporting
+- 📦 Integrated GitHub Release creation with release notes support
+- 🏷️ Maintained full backward compatibility with existing tag functions
+
+### v0.1.0
 - ✨ Initial release with smart tag intelligence
 - 🎯 Support for moving and static tag strategies
 - 🔧 Comprehensive semantic version validation
