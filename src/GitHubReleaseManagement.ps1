@@ -415,19 +415,50 @@ function New-GitHubDraftRelease {
             
             $output = & gh @ghArgs 2>&1
             if ($LASTEXITCODE -eq 0) {
-                # Extract release URL from output
-                $result.HtmlUrl = $output | Where-Object { $_ -match "https://github.com/.+/releases/" } | Select-Object -First 1
-                if (-not $result.HtmlUrl) {
-                    $result.HtmlUrl = $output -join "`n"
+                # Extract release URL from output (gh release create outputs the URL)
+                $releaseUrl = $output | Where-Object { $_ -match "https://github.com/.+/releases/" } | Select-Object -First 1
+                if ($releaseUrl) {
+                    $result.HtmlUrl = $releaseUrl.Trim()
+                } else {
+                    $result.HtmlUrl = ($output -join "`n").Trim()
                 }
                 
-                # Get release details
+                # Try to get release details via gh release view
+                # Note: Draft releases may use "untagged-*" format, so we try both approaches
+                $releaseDetails = $null
+                
+                # First try: Use the version tag directly
                 $releaseDetails = gh release view $Version --json id,htmlUrl,isDraft,createdAt 2>$null | ConvertFrom-Json
-                if ($releaseDetails) {
+                
+                # Second try: If no details found, list all releases and find by URL
+                if (-not $releaseDetails -or -not $releaseDetails.id) {
+                    Write-SafeDebugLog -Message "Trying to find release by URL" -Additional @{ URL = $result.HtmlUrl }
+                    $allReleases = gh release list --json tagName,isDraft,url --limit 10 2>$null | ConvertFrom-Json
+                    if ($allReleases) {
+                        # Find the draft release we just created (most recent draft)
+                        $draftRelease = $allReleases | Where-Object { $_.isDraft -eq $true } | Select-Object -First 1
+                        if ($draftRelease) {
+                            $releaseDetails = gh release view $draftRelease.tagName --json id,htmlUrl,isDraft,createdAt 2>$null | ConvertFrom-Json
+                        }
+                    }
+                }
+                
+                # Third try: Extract tag from URL if it contains "untagged-" pattern
+                if ((-not $releaseDetails -or -not $releaseDetails.id) -and $result.HtmlUrl -match '/releases/tag/(.+)$') {
+                    $extractedTag = $Matches[1]
+                    Write-SafeDebugLog -Message "Trying extracted tag from URL" -Additional @{ Tag = $extractedTag }
+                    $releaseDetails = gh release view $extractedTag --json id,htmlUrl,isDraft,createdAt 2>$null | ConvertFrom-Json
+                }
+                
+                if ($releaseDetails -and $releaseDetails.id) {
                     $result.ReleaseId = $releaseDetails.id
                     $result.HtmlUrl = $releaseDetails.htmlUrl
                     $result.IsDraft = $releaseDetails.isDraft
                     $result.CreatedAt = $releaseDetails.createdAt
+                } else {
+                    # Fallback: Use the URL as identifier (for publish step we'll use tag name instead)
+                    Write-SafeWarningLog -Message "Could not retrieve release ID, using version as fallback" -Additional @{ Version = $Version }
+                    $result.ReleaseId = $Version  # Use version/tag as fallback identifier
                 }
                 
                 $result.Success = $true
@@ -476,7 +507,7 @@ function Publish-GitHubRelease {
     Publishes a GitHub draft release using GitHub CLI.
 
     .PARAMETER ReleaseId
-    The GitHub release ID to publish.
+    The GitHub release ID or tag name to publish.
 
     .PARAMETER RepositoryPath
     Path to the Git repository.
@@ -487,6 +518,7 @@ function Publish-GitHubRelease {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
         [string]$ReleaseId,
 
         [Parameter()]
@@ -513,19 +545,30 @@ function Publish-GitHubRelease {
         try {
             Push-Location $RepositoryPath
             
-            # Get current release info
+            # ReleaseId can be either:
+            # 1. A GitHub internal release ID (e.g., "RE_kwDON...")
+            # 2. A tag name (e.g., "v0.1.46")
+            # 3. An untagged release identifier (e.g., "untagged-abc123")
+            
+            # Try to get release info - gh release view accepts both ID and tag name
             $releaseInfo = gh release view $ReleaseId --json tagName 2>$null | ConvertFrom-Json
-            if (-not $releaseInfo) {
-                throw "Release with ID $ReleaseId not found"
+            
+            # Determine the tag name to use for editing
+            $tagName = if ($releaseInfo -and $releaseInfo.tagName) {
+                $releaseInfo.tagName
+            } else {
+                # If we can't get release info, assume ReleaseId is the tag name itself
+                Write-SafeDebugLog -Message "Using ReleaseId as tag name" -Additional @{ ReleaseId = $ReleaseId }
+                $ReleaseId
             }
             
-            $tagName = $releaseInfo.tagName
+            Write-SafeDebugLog -Message "Publishing release with tag" -Additional @{ TagName = $tagName }
             
             # Publish release
             if ($MarkAsLatest) {
-                gh release edit $tagName --draft=false --latest
+                $editOutput = gh release edit $tagName --draft=false --latest 2>&1
             } else {
-                gh release edit $tagName --draft=false
+                $editOutput = gh release edit $tagName --draft=false 2>&1
             }
             
             if ($LASTEXITCODE -eq 0) {
@@ -534,9 +577,10 @@ function Publish-GitHubRelease {
                 $result.MarkedAsLatest = $MarkAsLatest.IsPresent
                 $result.PublishedAt = Get-Date
                 
-                Write-SafeInfoLog -Message "Release published successfully" -Additional @{ ReleaseId = $ReleaseId; Latest = $MarkAsLatest.IsPresent }
+                Write-SafeInfoLog -Message "Release published successfully" -Additional @{ ReleaseId = $ReleaseId; TagName = $tagName; Latest = $MarkAsLatest.IsPresent }
             } else {
-                throw "Failed to publish release"
+                $errorMsg = if ($editOutput) { $editOutput -join "`n" } else { "Unknown error" }
+                throw "Failed to publish release '$tagName': $errorMsg"
             }
 
         }
