@@ -1,58 +1,42 @@
-name: 🚀 Smart PowerShell Module Release Pipeline
+name: 🚀 PowerShell Module Release Pipeline
 
-# 🎯 Triggers: Push to master branch (e.g., PR merge)
-# 📋 Required Repository Variables:
-# - UBUNTU_VERSION: Ubuntu runner version (e.g., "ubuntu-22.04")
-# - MODULE_NAME: PowerShell module name for dispatch
-# - TARGET_REPOSITORY: Target repository for auto-publish dispatch
-# 📋 Required Repository Secrets:
-# - REPO_DISPATCH_TOKEN: Personal Access Token for cross-repo dispatch
-
+# 🎯 Triggers
+# - Push to master/main branch (e.g., PR merge)
+# - Manual dispatch with optional version override
 on:
   push:
     branches: [master, main]
   workflow_dispatch:
-    # Optional manual trigger for testing
     inputs:
-      test:
-        description: "Run validation only (no dispatch)"
+      version:
+        description: '📌 Override version (e.g., 1.2.3, leave empty for auto-detection)'
         required: false
-        default: false
+        type: string
+        default: ''
+      enable-psgallery-notification:
+        description: '📣 Enable notification to K.PSGallery pipeline (true/false)'
+        required: false
         type: boolean
+        default: true
 
 env:
-  # 🌍 Global environment variables for consistency
+  # 🌍 Global Configuration
   RELEASE_AUTHOR: "github-actions[bot]"
   RELEASE_EMAIL: "github-actions[bot]@users.noreply.github.com"
-  # 📦 Module Configuration (can be overridden by repository variables)
-  MODULE_NAME: ${{ vars.MODULE_NAME || 'K.PSGallery.SmartAgr' }}
+  UBUNTU_VERSION: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
+  # 📦 Module Configuration
+  MODULE_NAME: ${{ vars.MODULE_NAME || 'K.PSGallery.Smartagr' }}
   TARGET_REPOSITORY: ${{ vars.TARGET_REPOSITORY || 'GrexyLoco/K.PSGallery' }}
-  
-  # 🔄 Smartagr Import Strategy (Bootstrap Configuration)
-  # ⚠️ IMPORTANT: This controls where Smartagr module is loaded from during tag creation
-  # 
-  # Repository Variable: SMARTAGR_USE_PSGALLERY (boolean)
-  #   - Not set or 'false' = Import from LOCAL repository (default, self-hosting)
-  #   - 'true'            = Import from PSGallery (stable releases, one-version-behind)
-  # 
-  # 📌 Migration Path:
-  #    1. Pre-v1.0.0:  No variable set → LOCAL import (bootstrap phase)
-  #    2. Post-v1.0.0: Set variable to 'true' → PSGallery import (stable phase)
-  #    3. Breaking changes: Set to 'false' temporarily → LOCAL import
-  # 
-  # ⚠️ Trade-offs:
-  #    - Local:    Version N tags version N (self-tagging, breaking changes supported)
-  #    - PSGallery: Version N tags version N+1 (feature lag, stable releases only)
-  # 
-  # 🔧 How to configure: Settings → Secrets and variables → Actions → Variables
-  #    Variable name: SMARTAGR_USE_PSGALLERY
-  #    Variable value: true (for PSGallery) or false/unset (for local)
-  USE_PSGALLERY_SMARTAGR: ${{ vars.SMARTAGR_USE_PSGALLERY || 'false' }}
+  # 📣 PSGallery notification: Input > Environment Variable > Default (true)
+  ENABLE_PSGALLERY_NOTIFICATION: ${{ github.event.inputs.enable-psgallery-notification || vars.ENABLE_PSGALLERY_NOTIFICATION || 'true' }}
 
 jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 🔐 JOB 1: QUALITY GATE - Security & Tests
+  # ═══════════════════════════════════════════════════════════════════════════
   quality-gate:
-    name: 🔐 Quality Gate
-    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-22.04' }}
+    name: 🔐 Security & 🧪 Tests
+    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
     outputs:
       test-success: ${{ steps.validation.outputs.test-success }}
       total-tests: ${{ steps.validation.outputs.total-tests }}
@@ -61,14 +45,14 @@ jobs:
       skipped-tests: ${{ steps.validation.outputs.skipped-tests }}
       test-duration: ${{ steps.validation.outputs.test-duration }}
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: 🔐 Validate PowerShell Module
+      - name: 🧪 Validate PowerShell Module
         id: validation
-        uses: GrexyLoco/K.Actions.PSModuleValidation@v1.0.1
+        uses: GrexyLoco/K.Actions.PSModuleValidation@v1
         with:
           test-path: "./Tests"
           output-path: "./TestResults.xml"
@@ -76,185 +60,230 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           module-name: ${{ env.MODULE_NAME }}
 
-  version-and-tag:
-    name: 📦 Version & Tag
-    runs-on: ubuntu-latest
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 📦 JOB 2: PREPARE RELEASE - Version Management & PSD1 Update
+  # ═══════════════════════════════════════════════════════════════════════════
+  prepare-release:
+    name: 📦 Prepare Release
     needs: quality-gate
     if: needs.quality-gate.outputs.test-success == 'true'
+    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
     outputs:
-      new-version: ${{ steps.version.outputs.newVersion }}
-      current-version: ${{ steps.version.outputs.currentVersion }}
-      bump-type: ${{ steps.version.outputs.bumpType }}
-      last-release-tag: ${{ steps.version.outputs.lastReleaseTag }}
+      new-version: ${{ steps.determine-version.outputs.final-version }}
+      bump-type: ${{ steps.next-version.outputs.bumpType }}
+      should-release: ${{ steps.determine-version.outputs.should-release }}
+      current-version: ${{ steps.next-version.outputs.currentVersion }}
+      last-release-tag: ${{ steps.next-version.outputs.lastReleaseTag }}
     permissions:
       contents: write
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: true
 
-      - name: 🔢 Calculate next version
-        id: version
-        uses: GrexyLoco/K.Actions.NextVersion@v1
+      # ─────────────────────────────────────────────────────────────────────
+      # 🔢 Version Detection: Manual Override vs. Auto-Detection
+      # ─────────────────────────────────────────────────────────────────────
+      - name: ⬆️ Analyze next version
+        id: next-version
+        if: github.event.inputs.version == ''
+        uses: GrexyLoco/K.Actions.NextVersion@latest
         with:
-          manifestPath: './K.PSGallery.Smartagr.psd1'
+          manifestPath: './${{ env.MODULE_NAME }}.psd1'
           branchName: ${{ github.ref_name }}
           targetBranch: 'master'
 
-      - name: 📝 Update Manifest Version
-        if: steps.version.outputs.newVersion != ''
+      - name: 🔢 Determine final version
+        id: determine-version
         shell: pwsh
         run: |
-          $manifestPath = './K.PSGallery.Smartagr.psd1'
-          $newVersion = '${{ steps.version.outputs.newVersion }}'
+          $manualVersion = '${{ github.event.inputs.version }}'
+          $autoBumpType = '${{ steps.next-version.outputs.bumpType }}'
+          $autoNewVersion = '${{ steps.next-version.outputs.newVersion }}'
+          
+          if ($manualVersion) {
+            $finalVersion = $manualVersion -replace '^v', ''
+            $shouldRelease = 'true'
+            $bumpType = 'manual'
+            Write-Output "📌 Using manual version override: $finalVersion"
+          }
+          elseif ($autoBumpType -eq 'none' -or -not $autoNewVersion) {
+            $finalVersion = ''
+            $shouldRelease = 'false'
+            $bumpType = 'none'
+            Write-Output "ℹ️ No version changes detected"
+          }
+          else {
+            $finalVersion = $autoNewVersion
+            $shouldRelease = 'true'
+            $bumpType = $autoBumpType
+            Write-Output "🔄 Auto-detected version: $finalVersion ($bumpType)"
+          }
+          
+          "final-version=$finalVersion" >> $env:GITHUB_OUTPUT
+          "should-release=$shouldRelease" >> $env:GITHUB_OUTPUT
+          "bump-type=$bumpType" >> $env:GITHUB_OUTPUT
+
+      - name: 🛑 Skip if no changes
+        if: steps.determine-version.outputs.should-release == 'false'
+        run: |
+          echo "## 🔁 No Release Required" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ No version changes detected - workflow exits gracefully" >> $GITHUB_STEP_SUMMARY
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 📝 Update PSD1 ModuleVersion
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 📝 Update PowerShell Module Version
+        if: steps.determine-version.outputs.should-release == 'true'
+        shell: pwsh
+        run: |
+          $manifestPath = './${{ env.MODULE_NAME }}.psd1'
+          $newVersion = '${{ steps.determine-version.outputs.final-version }}'
           
           Write-Host "🔄 Updating manifest version to $newVersion..."
           
-          # Read current manifest
           $content = Get-Content $manifestPath -Raw
-          
-          # Update ModuleVersion with regex
           $updatedContent = $content -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$newVersion'"
           
-          # Verify the replacement worked
           if ($updatedContent -notmatch "ModuleVersion\s*=\s*'$newVersion'") {
-            Write-Error "❌ MANIFEST UPDATE FAILED!"
-            Write-Error ""
-            Write-Error "⚠️  CRITICAL: Das Manifest konnte nicht aktualisiert werden."
-            Write-Error "    Dies führt zu einem Konflikt zwischen Git-Tags und Manifest-Version."
-            Write-Error ""
-            Write-Error "📋 Mögliche Ursachen:"
-            Write-Error "    • ModuleVersion-Format im Manifest ist ungültig"
-            Write-Error "    • Regex-Pattern konnte Version nicht finden"
-            Write-Error "    • Datei ist schreibgeschützt"
-            Write-Error ""
-            Write-Error "🔧 Manuelle Lösung erforderlich:"
-            Write-Error "    1. Prüfe K.PSGallery.Smartagr.psd1 auf korrekte ModuleVersion-Syntax"
-            Write-Error "    2. Aktualisiere ModuleVersion manuell auf '$newVersion'"
-            Write-Error "    3. Commit mit Message: 'chore: update manifest to $newVersion [skip ci]'"
-            Write-Error ""
-            exit 1
+            throw "❌ Manifest update failed!"
           }
           
-          # Write updated content back
           Set-Content -Path $manifestPath -Value $updatedContent -NoNewline
+          Write-Host "✅ Manifest updated to version $newVersion"
           
-          Write-Host "✅ Manifest successfully updated to version $newVersion"
-          
-          # Configure git
           git config user.name "${{ env.RELEASE_AUTHOR }}"
           git config user.email "${{ env.RELEASE_EMAIL }}"
           
-          # Commit the updated manifest
           git add $manifestPath
-          git commit -m "chore: update manifest to $newVersion [skip ci]"
+          git commit -m "chore: bump version to $newVersion [skip ci]"
           git push origin ${{ github.ref_name }}
           
-          Write-Host "✅ Manifest changes committed and pushed"
+          Write-Host "✅ Version update committed and pushed"
 
-      # TEMPORARY: Simple tag creation to publish the improved version to PSGallery
-      # TODO: Re-enable Smartagr tagging after this version is published
-      # - name: 🏷️ Create Git Tag (Simple - Temporary)
-      #   if: steps.version.outputs.newVersion != ''
-      #   run: |
-      #     git config user.name "${{ env.RELEASE_AUTHOR }}"
-      #     git config user.email "${{ env.RELEASE_EMAIL }}"
+      - name: 🔄 Re-fetch after version update
+        if: steps.determine-version.outputs.should-release == 'true'
+        run: |
+          git fetch origin ${{ github.ref_name }}
+          git reset --hard origin/${{ github.ref_name }}
+          echo "✅ Repository state synchronized"
+
+      - name: 📝 Version Summary
+        if: always()
+        shell: bash
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 📦 Version Calculation
           
-      #     # Check if tag already exists
-      #     if git rev-parse "v${{ steps.version.outputs.newVersion }}" >/dev/null 2>&1; then
-      #       echo "⚠️ Tag v${{ steps.version.outputs.newVersion }} already exists - skipping"
-      #     else
-      #       git tag -a "v${{ steps.version.outputs.newVersion }}" -m "Release v${{ steps.version.outputs.newVersion }}"
-      #       git push origin "v${{ steps.version.outputs.newVersion }}"
-      #       echo "✅ Tag v${{ steps.version.outputs.newVersion }} successfully created"
-      #     fi
+          | Property | Value |
+          |----------|-------|
+          | **Current Version** | `${{ steps.next-version.outputs.currentVersion }}` |
+          | **New Version** | `${{ steps.determine-version.outputs.final-version }}` |
+          | **Bump Type** | `${{ steps.next-version.outputs.bumpType }}` |
+          | **Last Release Tag** | `${{ steps.next-version.outputs.lastReleaseTag }}` |
+          | **Should Release** | `${{ steps.determine-version.outputs.should-release }}` |
+          
+          ---
+          EOF
 
-      # DISABLED: Smartagr-based tagging (will be re-enabled after next publish)
-      - name: 🚀 Create Smart Release (Git Tags + GitHub Release)
-        if: steps.version.outputs.newVersion != ''
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 🚀 JOB 3: GITHUB RELEASE - Smart Tags + GitHub Release via Smartagr
+  # ═══════════════════════════════════════════════════════════════════════════
+  github-release:
+    name: 🚀 GitHub Release
+    needs: [quality-gate, prepare-release]
+    if: needs.prepare-release.outputs.should-release == 'true'
+    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
+    outputs:
+      release-created: ${{ steps.smart-release.outputs.release-created }}
+      release-url: ${{ steps.smart-release.outputs.release-url }}
+      tags-created: ${{ steps.smart-release.outputs.tags-created }}
+    permissions:
+      contents: write
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: 🔄 Sync to latest commit
+        run: |
+          git fetch origin ${{ github.ref_name }}
+          git reset --hard origin/${{ github.ref_name }}
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 🚀 Create Smart Release (Git Tags + GitHub Release)
+      #    Uses LOCAL Smartagr module (self-hosting/bootstrap)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚀 Create Smart Release
+        id: smart-release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 🔧 Configure Git for tagging
           git config user.name "${{ env.RELEASE_AUTHOR }}"
           git config user.email "${{ env.RELEASE_EMAIL }}"
           
-          # 📦 Import Smartagr module (strategy controlled by SMARTAGR_USE_PSGALLERY variable)
-          if ('${{ env.USE_PSGALLERY_SMARTAGR }}' -eq 'true') {
-            Write-Output "📦 Importing K.PSGallery.Smartagr from PSGallery (stable release)..."
-            Write-Output "   ℹ️  Using published version (one-version-behind strategy)"
-            # Ensure we have latest published version
-            Install-Module -Name K.PSGallery.Smartagr -Force -Scope CurrentUser -AllowClobber -Verbose
-            Import-Module K.PSGallery.Smartagr -Force -Verbose
-          } else {
-            Write-Output "📦 Importing LOCAL K.PSGallery.Smartagr module (self-hosting)..."
-            Write-Output "   Path: ${{ github.workspace }}/K.PSGallery.Smartagr.psd1"
-            Write-Output "   ℹ️  Using local version (bootstrap/breaking-changes mode)"
-            Import-Module "${{ github.workspace }}/K.PSGallery.Smartagr.psd1" -Force -Verbose
-          }
+          # Import LOCAL Smartagr module (self-hosting)
+          Write-Output "📦 Importing LOCAL K.PSGallery.Smartagr module..."
+          Import-Module "${{ github.workspace }}/${{ env.MODULE_NAME }}.psd1" -Force -Verbose
           
-          # 🚀 Create Smart Release (Git Tags + GitHub Release)
-          Write-Output "🚀 Creating Smart Release for v${{ steps.version.outputs.newVersion }}..."
+          $targetVersion = "v${{ needs.prepare-release.outputs.new-version }}"
+          $bumpType = "${{ needs.prepare-release.outputs.bump-type }}"
+          $currentVersion = "${{ needs.prepare-release.outputs.current-version }}"
           
-          $targetVersion = "v${{ steps.version.outputs.newVersion }}"
-          $repoPath = "${{ github.workspace }}"
-          
-          # Build release notes
           $releaseNotes = @"
-          ## 📦 K.PSGallery.Smartagr v${{ steps.version.outputs.newVersion }}
+          ## 📦 ${{ env.MODULE_NAME }} v${{ needs.prepare-release.outputs.new-version }}
           
-          **Bump Type:** ${{ steps.version.outputs.bumpType }}
-          **Previous Version:** ${{ steps.version.outputs.currentVersion }}
+          **Bump Type:** $bumpType
+          **Previous Version:** $currentVersion
           
           ### 🔄 Changes
           - Automated release via GitHub Actions
           - See commit history for detailed changes
           
           ---
-          *Released by [K.PSGallery.Smartagr](https://www.powershellgallery.com/packages/K.PSGallery.Smartagr)*
+          *Released by [${{ env.MODULE_NAME }}](https://www.powershellgallery.com/packages/${{ env.MODULE_NAME }})*
           "@
           
-          # Ensure errors are caught
           $ErrorActionPreference = 'Stop'
           
           try {
-            # Use New-SmartRelease for full-stack release (Git Tags + GitHub Release)
             $result = New-SmartRelease `
               -TargetVersion $targetVersion `
-              -RepositoryPath $repoPath `
+              -RepositoryPath "${{ github.workspace }}" `
               -ReleaseNotes $releaseNotes `
               -PushToRemote `
               -Verbose
             
             if ($result.Success) {
               Write-Output "✅ Smart Release created successfully"
-              Write-Output "   Version: $($result.TargetVersion)"
-              Write-Output "   Tags: $($result.TagsCreated -join ', ')"
-              Write-Output "   Release URL: $($result.ReleaseUrl)"
               
-              # Format tag lists for summary with markdown backticks
+              "release-created=true" >> $env:GITHUB_OUTPUT
+              "release-url=$($result.ReleaseUrl)" >> $env:GITHUB_OUTPUT
+              "tags-created=$($result.TagsCreated -join ',')" >> $env:GITHUB_OUTPUT
+              
               $tagsCreatedList = if ($result.TagsCreated.Count -gt 0) { 
                 ($result.TagsCreated | ForEach-Object { '`{0}`' -f $_ }) -join ', '
               } else { 
                 "_(none)_" 
               }
               
-              # 📝 Add summary to GitHub Actions UI
               @"
-          ## 🚀 Smart Release (Smartagr Full-Stack)
+          ## 🚀 Smart Release Created
           
-          **Target Version:** ``$($result.TargetVersion)``
-          **Bump Type:** ``${{ steps.version.outputs.bumpType }}``
-          
-          ### ✅ Release Created
-          - **GitHub Release:** [View Release]($($result.ReleaseUrl))
-          - **Tags Created:** $tagsCreatedList
-          - **Draft Created:** $($result.ReleaseDraftCreated)
-          - **Published:** $($result.ReleasePublished)
+          | Property | Value |
+          |----------|-------|
+          | **Target Version** | ``$($result.TargetVersion)`` |
+          | **Bump Type** | ``$bumpType`` |
+          | **Release URL** | [View Release]($($result.ReleaseUrl)) |
+          | **Tags Created** | $tagsCreatedList |
           
           ### 📊 Step Results
           | Step | Status |
@@ -264,40 +293,121 @@ jobs:
           | Release Publication | $($result.StepResults.ReleasePublication.Success ? '✅' : '❌') |
           
           ---
-          *Powered by [K.PSGallery.Smartagr](https://www.powershellgallery.com/packages/K.PSGallery.Smartagr) Full-Stack Release*
+          *Powered by [K.PSGallery.Smartagr](https://www.powershellgallery.com/packages/K.PSGallery.Smartagr)*
           "@ >> $env:GITHUB_STEP_SUMMARY
               
             } else {
-              throw "Smart Release failed: $($result.GitHubSummary)"
+              throw "Smart Release failed"
             }
           }
           catch {
+            "release-created=false" >> $env:GITHUB_OUTPUT
             throw
           }
 
-      - name: 📝 Release Summary
-        if: always()
-        shell: bash
-        run: |
-          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
-          ## 📦 Version Calculation
-
-          **Current Version:** `${{ steps.version.outputs.currentVersion }}`
-          **New Version:** `${{ steps.version.outputs.newVersion }}`
-          **Bump Type:** `${{ steps.version.outputs.bumpType }}`
-          **Last Release Tag:** `${{ steps.version.outputs.lastReleaseTag }}`
-
-          ---
-          EOF
-
-  trigger-publish:
-    name: 🚀 Trigger Publish via Repo Dispatch (K.PSGallery)
-    runs-on: ubuntu-latest
-    needs: [quality-gate, version-and-tag]
-    if: needs.quality-gate.outputs.test-success == 'true' && needs.version-and-tag.outputs.new-version != ''
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 📤 JOB 4: PUBLISH TO GITHUB PACKAGES
+  # ═══════════════════════════════════════════════════════════════════════════
+  publish-package:
+    name: 📤 Publish to GitHub Packages
+    needs: [quality-gate, prepare-release, github-release]
+    if: needs.github-release.outputs.release-created == 'true'
+    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
+    permissions:
+      packages: write
+      contents: read
     steps:
-      - name: 📤 Dispatch to auto-publish workflow
-        uses: peter-evans/repository-dispatch@v4
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔄 Sync to latest commit
+        run: |
+          git fetch origin ${{ github.ref_name }}
+          git reset --hard origin/${{ github.ref_name }}
+
+      - name: 📤 Publish to GitHub Packages
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $moduleName = '${{ env.MODULE_NAME }}'
+          $newVersion = '${{ needs.prepare-release.outputs.new-version }}'
+          $repoOwner = '${{ github.repository_owner }}'
+          
+          Write-Output "## 📦 Package Publishing" >> $env:GITHUB_STEP_SUMMARY
+          Write-Output "" >> $env:GITHUB_STEP_SUMMARY
+          Write-Output "| Property | Value |" >> $env:GITHUB_STEP_SUMMARY
+          Write-Output "|----------|-------|" >> $env:GITHUB_STEP_SUMMARY
+          Write-Output "| **Module** | ``$moduleName`` |" >> $env:GITHUB_STEP_SUMMARY
+          Write-Output "| **Version** | ``$newVersion`` |" >> $env:GITHUB_STEP_SUMMARY
+          Write-Output "| **Repository** | GitHub Packages |" >> $env:GITHUB_STEP_SUMMARY
+          Write-Output "" >> $env:GITHUB_STEP_SUMMARY
+          
+          $sourceUrl = "https://nuget.pkg.github.com/$repoOwner/index.json"
+          
+          # Try K.PSGallery.PackageRepoProvider first
+          try {
+            Install-Module -Name K.PSGallery.PackageRepoProvider -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
+            Import-Module K.PSGallery.PackageRepoProvider -ErrorAction Stop
+            
+            Write-Output "✅ Using K.PSGallery.PackageRepoProvider"
+            
+            Register-PackageRepo `
+              -RepoName 'GitHubPackages' `
+              -SourceUrl $sourceUrl `
+              -PublishUrl "https://nuget.pkg.github.com/$repoOwner" `
+              -NugetKey $env:GITHUB_TOKEN
+            
+            Publish-Package `
+              -ModuleName $moduleName `
+              -RepoName 'GitHubPackages'
+            
+            Write-Output "### ✅ Published via PackageRepoProvider" >> $env:GITHUB_STEP_SUMMARY
+            "package-published=true" >> $env:GITHUB_OUTPUT
+          }
+          catch {
+            Write-Output "⚠️ PackageRepoProvider not available - using Publish-PSResource fallback"
+            
+            try {
+              $repoName = 'GitHubPackages'
+              
+              Get-PSResourceRepository -Name $repoName -ErrorAction SilentlyContinue | 
+                Unregister-PSResourceRepository -ErrorAction SilentlyContinue
+              
+              Register-PSResourceRepository `
+                -Name $repoName `
+                -Uri $sourceUrl `
+                -Trusted
+              
+              Publish-PSResource `
+                -Path "./$moduleName" `
+                -Repository $repoName `
+                -ApiKey $env:GITHUB_TOKEN
+              
+              Write-Output "### ✅ Published via Publish-PSResource (fallback)" >> $env:GITHUB_STEP_SUMMARY
+              "package-published=true" >> $env:GITHUB_OUTPUT
+            }
+            catch {
+              Write-Output "### ❌ Package Publishing Failed" >> $env:GITHUB_STEP_SUMMARY
+              Write-Output "Error: $($_.Exception.Message)" >> $env:GITHUB_STEP_SUMMARY
+              "package-published=false" >> $env:GITHUB_OUTPUT
+              throw
+            }
+          }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 📣 JOB 5: NOTIFY K.PSGALLERY PIPELINE
+  # ═══════════════════════════════════════════════════════════════════════════
+  notify-psgallery:
+    name: 📣 Notify K.PSGallery
+    needs: [quality-gate, prepare-release, github-release, publish-package]
+    if: needs.github-release.outputs.release-created == 'true'
+    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
+    steps:
+      - name: 📤 Dispatch to K.PSGallery pipeline
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.REPO_DISPATCH_TOKEN }}
           repository: ${{ env.TARGET_REPOSITORY }}
@@ -305,31 +415,32 @@ jobs:
           client-payload: |
             {
               "repo": "${{ github.repository }}",
-              "tag": "v${{ needs.version-and-tag.outputs.new-version }}",
-              "bump_type": "${{ needs.version-and-tag.outputs.bump-type }}",
+              "tag": "v${{ needs.prepare-release.outputs.new-version }}",
+              "bump_type": "${{ needs.prepare-release.outputs.bump-type }}",
               "triggered_by": "${{ github.actor }}",
               "source_url": "https://github.com/${{ github.repository }}",
-              "gallery_url": "https://www.powershellgallery.com/packages/${{ env.MODULE_NAME }}/${{ needs.version-and-tag.outputs.new-version }}"
+              "module_name": "${{ env.MODULE_NAME }}",
+              "gallery_url": "https://www.powershellgallery.com/packages/${{ env.MODULE_NAME }}/${{ needs.prepare-release.outputs.new-version }}",
+              "enable_psgallery_publish": "${{ env.ENABLE_PSGALLERY_NOTIFICATION }}"
             }
 
       - name: 📝 Dispatch Summary
-        if: always()
         shell: bash
         run: |
           cat >> $GITHUB_STEP_SUMMARY << 'EOF'
-          ## 🚀 Auto-Publish Pipeline Triggered
-
-          **Module:** `${{ env.MODULE_NAME }}`
-          **Target Repository:** `${{ env.TARGET_REPOSITORY }}`
-          **Source Repository:** `${{ github.repository }}`
-          **Branch:** `${{ github.ref_name }}`
-          **Status:** ✅ Dispatch sent successfully
-
-          The auto-publish pipeline will now handle:
-          - 🔢 Semantic version calculation
-          - 📦 Module packaging
-          - 🚀 PowerShell Gallery publishing
-          - 🏷️ GitHub release creation
-
+          ## 📣 K.PSGallery Pipeline Triggered
+          
+          | Property | Value |
+          |----------|-------|
+          | **Module** | `${{ env.MODULE_NAME }}` |
+          | **Version** | `v${{ needs.prepare-release.outputs.new-version }}` |
+          | **Target Repository** | `${{ env.TARGET_REPOSITORY }}` |
+          | **PSGallery Publish** | `${{ env.ENABLE_PSGALLERY_NOTIFICATION }}` |
+          
+          The K.PSGallery pipeline will handle:
+          - 📦 Download from GitHub Packages
+          - 🚀 Publish to PowerShell Gallery
+          - 📣 Release notifications
+          
           ---
           EOF
