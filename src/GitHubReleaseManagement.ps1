@@ -192,21 +192,22 @@ function New-SmartRelease {
                 $result.StepResults.TagCreation.Timestamp = Get-Date
                 
                 if ($WhatIfPreference) {
-                    # WhatIf simulation for tag creation
+                    # WhatIf simulation for tag creation (matches New-SemanticReleaseTags output format)
                     $mockTagResult = [PSCustomObject]@{
                         Success = $true
-                        TagsCreated = @("$normalizedVersion", "latest", "v0.1")
-                        TagsMovedFrom = @{ "latest" = "v0.1.0"; "v0.1" = "v0.1.0" }
-                        TagsStaticized = @()
+                        AllTags = @("$normalizedVersion", "latest", "v0.1")
+                        SmartTags = @("v0.1")
+                        MovingTags = @("latest")
+                        ReleaseTag = $normalizedVersion
                         ErrorMessage = ""
                     }
                     
                     $result.GitTagsResult = $mockTagResult
-                    $result.TagsCreated = $mockTagResult.TagsCreated
-                    $result.TagsMovedFrom = $mockTagResult.TagsMovedFrom
-                    $result.TagsStaticized = $mockTagResult.TagsStaticized
-                    $result.RollbackInfo.TagsToDelete = $mockTagResult.TagsCreated
-                    $result.RollbackInfo.TagsToRestore = $mockTagResult.TagsMovedFrom
+                    $result.TagsCreated = $mockTagResult.AllTags
+                    $result.TagsMovedFrom = @{}
+                    $result.TagsStaticized = @()
+                    $result.RollbackInfo.TagsToDelete = $mockTagResult.AllTags
+                    $result.RollbackInfo.TagsToRestore = @{}
                     $result.StepResults.TagCreation.Success = $true
                     $result.StepResults.TagCreation.Message = "Smart tags would be created successfully (WhatIf)"
                     
@@ -217,15 +218,16 @@ function New-SmartRelease {
                     
                     $result.GitTagsResult = $tagResult
                     if ($tagResult.Success) {
-                        $result.TagsCreated = $tagResult.TagsCreated
-                        $result.TagsMovedFrom = $tagResult.TagsMovedFrom
-                        $result.TagsStaticized = $tagResult.TagsStaticized
-                        $result.RollbackInfo.TagsToDelete = $tagResult.TagsCreated
-                        $result.RollbackInfo.TagsToRestore = $tagResult.TagsMovedFrom
+                        # Note: New-SemanticReleaseTags returns AllTags, SmartTags, MovingTags (not TagsCreated)
+                        $result.TagsCreated = if ($tagResult.AllTags) { @($tagResult.AllTags) } else { @() }
+                        $result.TagsMovedFrom = @{}  # MovingTags are in separate property
+                        $result.TagsStaticized = @()
+                        $result.RollbackInfo.TagsToDelete = $result.TagsCreated
+                        $result.RollbackInfo.TagsToRestore = @{}
                         $result.StepResults.TagCreation.Success = $true
                         $result.StepResults.TagCreation.Message = "Smart tags created successfully"
                         
-                        Write-SafeInfoLog -Message "Smart tags created successfully" -Additional @{ Tags = ($tagResult.TagsCreated -join ', ') }
+                        Write-SafeInfoLog -Message "Smart tags created successfully" -Additional @{ Tags = ($result.TagsCreated -join ', ') }
                     } else {
                         throw "Failed to create smart tags: $($tagResult.ErrorMessage)"
                     }
@@ -247,7 +249,14 @@ function New-SmartRelease {
                         $result.StepResults.ReleasePublication.Message = "Release published successfully"
                         $result.RollbackInfo.ReleaseToDelete = $null  # Don't delete published releases
                         
-                        Write-SafeInfoLog -Message "Release published successfully" -Additional @{ ReleaseId = $result.ReleaseId }
+                        # Update ReleaseUrl to use the correct tag-based URL (not untagged-xxx)
+                        # After publish, the release is now associated with the actual version tag
+                        $repoInfo = gh repo view --json nameWithOwner 2>$null | ConvertFrom-Json
+                        if ($repoInfo -and $repoInfo.nameWithOwner) {
+                            $result.ReleaseUrl = "https://github.com/$($repoInfo.nameWithOwner)/releases/tag/$normalizedVersion"
+                        }
+                        
+                        Write-SafeInfoLog -Message "Release published successfully" -Additional @{ ReleaseId = $result.ReleaseId; ReleaseUrl = $result.ReleaseUrl }
                     } else {
                         $result.ConflictsResolved += "Release publication failed but draft and tags exist: $($publishResult.ErrorMessage)"
                         $result.StepResults.ReleasePublication.Message = "Publication failed: $($publishResult.ErrorMessage)"
