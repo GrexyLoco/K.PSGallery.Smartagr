@@ -95,7 +95,6 @@ function New-SmartRelease {
         # Initialize comprehensive result object
         $result = [PSCustomObject]@{
             TargetVersion = $normalizedVersion
-            BumpType = "Patch"  # Will be determined
             Success = $false
             
             # Git Tag Results
@@ -199,7 +198,6 @@ function New-SmartRelease {
                         TagsCreated = @("$normalizedVersion", "latest", "v0.1")
                         TagsMovedFrom = @{ "latest" = "v0.1.0"; "v0.1" = "v0.1.0" }
                         TagsStaticized = @()
-                        BumpType = "Patch"
                         ErrorMessage = ""
                     }
                     
@@ -207,7 +205,6 @@ function New-SmartRelease {
                     $result.TagsCreated = $mockTagResult.TagsCreated
                     $result.TagsMovedFrom = $mockTagResult.TagsMovedFrom
                     $result.TagsStaticized = $mockTagResult.TagsStaticized
-                    $result.BumpType = $mockTagResult.BumpType
                     $result.RollbackInfo.TagsToDelete = $mockTagResult.TagsCreated
                     $result.RollbackInfo.TagsToRestore = $mockTagResult.TagsMovedFrom
                     $result.StepResults.TagCreation.Success = $true
@@ -223,7 +220,6 @@ function New-SmartRelease {
                         $result.TagsCreated = $tagResult.TagsCreated
                         $result.TagsMovedFrom = $tagResult.TagsMovedFrom
                         $result.TagsStaticized = $tagResult.TagsStaticized
-                        $result.BumpType = $tagResult.BumpType
                         $result.RollbackInfo.TagsToDelete = $tagResult.TagsCreated
                         $result.RollbackInfo.TagsToRestore = $tagResult.TagsMovedFrom
                         $result.StepResults.TagCreation.Success = $true
@@ -666,7 +662,6 @@ function New-SmartReleaseStepSummary {
 | Property | Value |
 |----------|-------|
 | **Target Version** | ``$($Result.TargetVersion)`` |
-| **Bump Type** | $($Result.BumpType) |
 | **Overall Success** | $(if($Result.Success){"✅ Yes"}else{"❌ No"}) |
 | **Duration** | $([math]::Round($Result.Duration.TotalSeconds, 2))s |
 | **Is Prerelease** | $(if($Result.IsPrerelease){"🧪 Yes"}else{"🚀 No"}) |
@@ -747,22 +742,26 @@ function ConvertTo-SmartReleaseStepOutputs {
         [PSCustomObject]$Result
     )
 
+    # Safely get values with null-coalescing
+    $tagsCreated = if ($Result.TagsCreated) { $Result.TagsCreated -join ',' } else { "" }
+    $tagsCreatedCount = if ($Result.TagsCreated) { $Result.TagsCreated.Count } else { 0 }
+    $durationSeconds = if ($Result.Duration) { [math]::Round($Result.Duration.TotalSeconds, 2) } else { 0 }
+
     $outputs = @{
         "success" = $Result.Success.ToString().ToLower()
-        "target-version" = $Result.TargetVersion
-        "bump-type" = $Result.BumpType.ToLower()
+        "target-version" = if ($Result.TargetVersion) { $Result.TargetVersion } else { "" }
         "is-prerelease" = $Result.IsPrerelease.ToString().ToLower()
-        "duration-seconds" = [math]::Round($Result.Duration.TotalSeconds, 2)
+        "duration-seconds" = $durationSeconds
         
         # Git tag outputs
-        "tags-created" = ($Result.TagsCreated -join ',')
-        "tags-created-count" = $Result.TagsCreated.Count
+        "tags-created" = $tagsCreated
+        "tags-created-count" = $tagsCreatedCount
         
         # GitHub release outputs
         "release-draft-created" = $Result.ReleaseDraftCreated.ToString().ToLower()
         "release-published" = $Result.ReleasePublished.ToString().ToLower()
-        "release-id" = $Result.ReleaseId
-        "release-url" = $Result.ReleaseUrl
+        "release-id" = if ($Result.ReleaseId) { $Result.ReleaseId } else { "" }
+        "release-url" = if ($Result.ReleaseUrl) { $Result.ReleaseUrl } else { ""  }
         
         # Workflow step statuses
         "draft-step-success" = $Result.StepResults.DraftCreation.Success.ToString().ToLower()
@@ -771,12 +770,12 @@ function ConvertTo-SmartReleaseStepOutputs {
     }
 
     # Add optional outputs
-    if ($Result.TagsMovedFrom.Count -gt 0) {
+    if ($Result.TagsMovedFrom -and $Result.TagsMovedFrom.Count -gt 0) {
         $outputs["tags-moved"] = ($Result.TagsMovedFrom.Keys -join ',')
         $outputs["tags-moved-count"] = $Result.TagsMovedFrom.Count
     }
 
-    if ($Result.ConflictsResolved.Count -gt 0) {
+    if ($Result.ConflictsResolved -and $Result.ConflictsResolved.Count -gt 0) {
         $outputs["issues-resolved"] = $Result.ConflictsResolved.Count
         $outputs["has-issues"] = "true"
     } else {

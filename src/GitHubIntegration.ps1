@@ -31,11 +31,7 @@ function New-GitHubStepSummary {
     )
 
     $statusIcon = if ($Result.Success) { "✅" } else { "❌" }
-    $operation = if ($Result.PSObject.Properties.Name -contains 'BumpType' -and $Result.BumpType -eq 'SmartTagBump') { 
-        "Smart Tag Bump" 
-    } else { 
-        "Semantic Release" 
-    }
+    $operation = "Semantic Release"
     
     $summary = @"
 ### $statusIcon **$operation Results**
@@ -43,7 +39,6 @@ function New-GitHubStepSummary {
 | Property | Value |
 |----------|-------|
 | **Target Version** | ``$($Result.TargetVersion)`` |
-| **Bump Type** | $($Result.BumpType) |
 | **Success** | $(if($Result.Success){"✅ Yes"}else{"❌ No"}) |
 | **Duration** | $([math]::Round($Result.Duration.TotalSeconds, 2))s |
 | **Tags Created** | $($Result.TagsCreated.Count) |
@@ -146,7 +141,6 @@ function ConvertTo-GitHubStepOutputs {
     $outputs = @{
         "success" = $Result.Success.ToString().ToLower()
         "target-version" = $Result.TargetVersion
-        "bump-type" = $Result.BumpType.ToLower()
         "tags-created" = ($Result.TagsCreated -join ',')
         "tags-created-count" = $Result.TagsCreated.Count
         "duration-seconds" = [math]::Round($Result.Duration.TotalSeconds, 2)
@@ -276,7 +270,6 @@ function Move-SmartTags {
         # Initialize result object (same structure as New-SemanticReleaseTags)
         $result = [PSCustomObject]@{
             TargetVersion = $normalizedVersion
-            BumpType = "SmartTagBump"
             Success = $false
             TagsCreated = @()  # Always empty for bump operations
             TagsMovedFrom = @{}
