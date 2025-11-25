@@ -86,7 +86,7 @@ function New-SmartRelease {
 
     begin {
         $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-        Write-SafeLog "INFO" "Starting smart release creation" "TargetVersion: $TargetVersion"
+        Write-SafeInfoLog -Message "Starting smart release creation" -Additional @{ TargetVersion = $TargetVersion }
         
         # Normalize version
         $normalizedVersion = if ($TargetVersion.StartsWith('v')) { $TargetVersion } else { "v$TargetVersion" }
@@ -141,7 +141,7 @@ function New-SmartRelease {
             
             # Step 1: Create GitHub Draft Release (if not skipped)
             if (-not $SkipGitHubRelease) {
-                Write-SafeLog "INFO" "Step 1: Creating GitHub draft release" "Version: $normalizedVersion"
+                Write-SafeInfoLog -Message "Step 1: Creating GitHub draft release" -Additional @{ Version = $normalizedVersion }
                 $result.StepResults.DraftCreation.Timestamp = Get-Date
                 
                 if ($PSCmdlet.ShouldProcess($normalizedVersion, "Create GitHub draft release")) {
@@ -157,7 +157,7 @@ function New-SmartRelease {
                         $result.StepResults.DraftCreation.Success = $true
                         $result.StepResults.DraftCreation.Message = "Draft release created successfully"
                         
-                        Write-SafeLog "INFO" "Draft release created successfully" "ReleaseId: $($draftResult.ReleaseId)"
+                        Write-SafeInfoLog -Message "Draft release created successfully" -Additional @{ ReleaseId = $draftResult.ReleaseId }
                     } else {
                         throw "Failed to create draft release: $($draftResult.ErrorMessage)"
                     }
@@ -180,7 +180,7 @@ function New-SmartRelease {
                     $result.StepResults.DraftCreation.Success = $true
                     $result.StepResults.DraftCreation.Message = "Draft release would be created successfully (WhatIf)"
                     
-                    Write-SafeLog "INFO" "Draft release simulation successful" "ReleaseId: $($mockDraftResult.ReleaseId) (WhatIf)"
+                    Write-SafeInfoLog -Message "Draft release simulation successful" -Additional @{ ReleaseId = "$($mockDraftResult.ReleaseId) (WhatIf)" }
                 }
             } else {
                 $result.StepResults.DraftCreation.Success = $true
@@ -189,7 +189,7 @@ function New-SmartRelease {
             
             # Step 2: Create Smart Tags (only if draft successful or skipped)
             if ($result.StepResults.DraftCreation.Success) {
-                Write-SafeLog "INFO" "Step 2: Creating smart tags" "Version: $normalizedVersion"
+                Write-SafeInfoLog -Message "Step 2: Creating smart tags" -Additional @{ Version = $normalizedVersion }
                 $result.StepResults.TagCreation.Timestamp = Get-Date
                 
                 if ($WhatIfPreference) {
@@ -213,7 +213,7 @@ function New-SmartRelease {
                     $result.StepResults.TagCreation.Success = $true
                     $result.StepResults.TagCreation.Message = "Smart tags would be created successfully (WhatIf)"
                     
-                    Write-SafeLog "INFO" "Smart tags simulation successful" "Tags: $($mockTagResult.TagsCreated -join ', ') (WhatIf)"
+                    Write-SafeInfoLog -Message "Smart tags simulation successful" -Additional @{ Tags = "$($mockTagResult.TagsCreated -join ', ') (WhatIf)" }
                 } else {
                     # Real execution
                     $tagResult = New-SemanticReleaseTags -TargetVersion $normalizedVersion -RepositoryPath $RepositoryPath -Force:$Force -PushToRemote:$PushToRemote
@@ -229,7 +229,7 @@ function New-SmartRelease {
                         $result.StepResults.TagCreation.Success = $true
                         $result.StepResults.TagCreation.Message = "Smart tags created successfully"
                         
-                        Write-SafeLog "INFO" "Smart tags created successfully" "Tags: $($tagResult.TagsCreated -join ', ')"
+                        Write-SafeInfoLog -Message "Smart tags created successfully" -Additional @{ Tags = ($tagResult.TagsCreated -join ', ') }
                     } else {
                         throw "Failed to create smart tags: $($tagResult.ErrorMessage)"
                     }
@@ -238,7 +238,7 @@ function New-SmartRelease {
             
             # Step 3: Publish GitHub Release (only if tags successful and release exists)
             if ($result.StepResults.TagCreation.Success -and $result.ReleaseDraftCreated) {
-                Write-SafeLog "INFO" "Step 3: Publishing GitHub release" "ReleaseId: $($result.ReleaseId)"
+                Write-SafeInfoLog -Message "Step 3: Publishing GitHub release" -Additional @{ ReleaseId = $result.ReleaseId }
                 $result.StepResults.ReleasePublication.Timestamp = Get-Date
                 
                 if ($PSCmdlet.ShouldProcess($result.ReleaseId, "Publish GitHub release")) {
@@ -251,7 +251,7 @@ function New-SmartRelease {
                         $result.StepResults.ReleasePublication.Message = "Release published successfully"
                         $result.RollbackInfo.ReleaseToDelete = $null  # Don't delete published releases
                         
-                        Write-SafeLog "INFO" "Release published successfully" "ReleaseId: $($result.ReleaseId)"
+                        Write-SafeInfoLog -Message "Release published successfully" -Additional @{ ReleaseId = $result.ReleaseId }
                     } else {
                         $result.ConflictsResolved += "Release publication failed but draft and tags exist: $($publishResult.ErrorMessage)"
                         $result.StepResults.ReleasePublication.Message = "Publication failed: $($publishResult.ErrorMessage)"
@@ -263,7 +263,7 @@ function New-SmartRelease {
                     $result.StepResults.ReleasePublication.Message = "Release would be published successfully (WhatIf)"
                     $result.RollbackInfo.ReleaseToDelete = $null  # Don't delete published releases in simulation
                     
-                    Write-SafeLog "INFO" "Release publication simulation successful" "ReleaseId: $($result.ReleaseId) (WhatIf)"
+                    Write-SafeInfoLog -Message "Release publication simulation successful" -Additional @{ ReleaseId = "$($result.ReleaseId) (WhatIf)" }
                 }
             }
             
@@ -278,7 +278,7 @@ function New-SmartRelease {
             $result.GitHubSummary = New-SmartReleaseStepSummary -Result $result
             $result.StepOutputs = ConvertTo-SmartReleaseStepOutputs -Result $result
             
-            Write-SafeLog "INFO" "Smart release completed" "Success: $($result.Success), Duration: $($result.Duration.TotalSeconds)s"
+            Write-SafeInfoLog -Message "Smart release completed" -Additional @{ Success = $result.Success; Duration = "$($result.Duration.TotalSeconds)s" }
 
         }
         catch {
@@ -289,7 +289,7 @@ function New-SmartRelease {
             
             # Rollback on failure
             if ($result.RollbackInfo.ReleaseToDelete) {
-                Write-SafeLog "WARN" "Rolling back: Deleting draft release" "ReleaseId: $($result.RollbackInfo.ReleaseToDelete)"
+                Write-SafeWarningLog -Message "Rolling back: Deleting draft release" -Additional @{ ReleaseId = $result.RollbackInfo.ReleaseToDelete }
                 try {
                     Remove-GitHubRelease -ReleaseId $result.RollbackInfo.ReleaseToDelete -RepositoryPath $RepositoryPath
                     $result.ConflictsResolved += "Rolled back: Deleted draft release $($result.RollbackInfo.ReleaseToDelete)"
@@ -298,7 +298,7 @@ function New-SmartRelease {
                 }
             }
             
-            Write-SafeLog "ERROR" "Smart release failed" "Error: $($_.Exception.Message)"
+            Write-SafeErrorLog -Message "Smart release failed" -Additional @{ Error = $_.Exception.Message }
             throw
         }
         finally {
@@ -357,7 +357,7 @@ function New-GitHubDraftRelease {
     )
 
     begin {
-        Write-SafeLog "INFO" "Creating GitHub draft release" "Version: $Version"
+        Write-SafeInfoLog -Message "Creating GitHub draft release" -Additional @{ Version = $Version }
         
         $result = [PSCustomObject]@{
             Version = $Version
@@ -411,7 +411,7 @@ function New-GitHubDraftRelease {
                 $ghArgs += "--prerelease"
             }
             
-            Write-SafeLog "DEBUG" "Executing GitHub CLI" "Command: gh $($ghArgs -join ' ')"
+            Write-SafeDebugLog -Message "Executing GitHub CLI" -Additional @{ Command = "gh $($ghArgs -join ' ')" }
             
             $output = & gh @ghArgs 2>&1
             if ($LASTEXITCODE -eq 0) {
@@ -431,7 +431,7 @@ function New-GitHubDraftRelease {
                 }
                 
                 $result.Success = $true
-                Write-SafeLog "INFO" "Draft release created successfully" "ReleaseId: $($result.ReleaseId), URL: $($result.HtmlUrl)"
+                Write-SafeInfoLog -Message "Draft release created successfully" -Additional @{ ReleaseId = $result.ReleaseId; URL = $result.HtmlUrl }
             } else {
                 $result.ErrorMessage = $output -join "`n"
                 throw "GitHub CLI failed: $($result.ErrorMessage)"
@@ -457,7 +457,7 @@ function New-GitHubDraftRelease {
                 "error-message" = $_.Exception.Message
             }
             
-            Write-SafeLog "ERROR" "Failed to create draft release" "Error: $($_.Exception.Message)"
+            Write-SafeErrorLog -Message "Failed to create draft release" -Additional @{ Error = $_.Exception.Message }
             throw
         }
         finally {
@@ -497,7 +497,7 @@ function Publish-GitHubRelease {
     )
 
     begin {
-        Write-SafeLog "INFO" "Publishing GitHub release" "ReleaseId: $ReleaseId"
+        Write-SafeInfoLog -Message "Publishing GitHub release" -Additional @{ ReleaseId = $ReleaseId }
         
         $result = [PSCustomObject]@{
             ReleaseId = $ReleaseId
@@ -534,7 +534,7 @@ function Publish-GitHubRelease {
                 $result.MarkedAsLatest = $MarkAsLatest.IsPresent
                 $result.PublishedAt = Get-Date
                 
-                Write-SafeLog "INFO" "Release published successfully" "ReleaseId: $ReleaseId, Latest: $($MarkAsLatest.IsPresent)"
+                Write-SafeInfoLog -Message "Release published successfully" -Additional @{ ReleaseId = $ReleaseId; Latest = $MarkAsLatest.IsPresent }
             } else {
                 throw "Failed to publish release"
             }
@@ -543,7 +543,7 @@ function Publish-GitHubRelease {
         catch {
             $result.Success = $false
             $result.ErrorMessage = $_.Exception.Message
-            Write-SafeLog "ERROR" "Failed to publish release" "Error: $($_.Exception.Message)"
+            Write-SafeErrorLog -Message "Failed to publish release" -Additional @{ Error = $_.Exception.Message }
             throw
         }
         finally {
@@ -584,16 +584,16 @@ function Remove-GitHubRelease {
         if ($releaseInfo) {
             gh release delete $releaseInfo.tagName --yes
             if ($LASTEXITCODE -eq 0) {
-                Write-SafeLog "INFO" "Release deleted successfully" "ReleaseId: $ReleaseId"
+                Write-SafeInfoLog -Message "Release deleted successfully" -Additional @{ ReleaseId = $ReleaseId }
                 return $true
             }
         }
         
-        Write-SafeLog "WARN" "Failed to delete release" "ReleaseId: $ReleaseId"
+        Write-SafeWarningLog -Message "Failed to delete release" -Additional @{ ReleaseId = $ReleaseId }
         return $false
     }
     catch {
-        Write-SafeLog "ERROR" "Error deleting release" "ReleaseId: $ReleaseId, Error: $($_.Exception.Message)"
+        Write-SafeErrorLog -Message "Error deleting release" -Additional @{ ReleaseId = $ReleaseId; Error = $_.Exception.Message }
         return $false
     }
     finally {
