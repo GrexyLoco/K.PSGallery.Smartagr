@@ -176,6 +176,8 @@ jobs:
       - name: 🚀 Create Smart Release (Git Tags + GitHub Release)
         if: steps.version.outputs.newVersion != ''
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # 🔧 Configure Git for tagging
           git config user.name "${{ env.RELEASE_AUTHOR }}"
