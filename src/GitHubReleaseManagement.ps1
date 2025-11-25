@@ -215,8 +215,8 @@ function New-SmartRelease {
                     
                     Write-SafeInfoLog -Message "Smart tags simulation successful" -Additional @{ Tags = "$($mockTagResult.TagsCreated -join ', ') (WhatIf)" }
                 } else {
-                    # Real execution
-                    $tagResult = New-SemanticReleaseTags -TargetVersion $normalizedVersion -RepositoryPath $RepositoryPath -Force:$Force -PushToRemote:$PushToRemote
+                    # Real execution - New-SemanticReleaseTags pushes tags automatically
+                    $tagResult = New-SemanticReleaseTags -TargetVersion $normalizedVersion -RepositoryPath $RepositoryPath -Force:$Force
                     
                     $result.GitTagsResult = $tagResult
                     if ($tagResult.Success) {
