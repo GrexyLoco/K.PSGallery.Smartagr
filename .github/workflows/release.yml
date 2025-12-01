@@ -2,7 +2,7 @@ name: 🚀 PowerShell Module Release Pipeline
 
 # 🎯 Triggers
 # - Manual dispatch with optional version override
-# - Pull requests merged to master/main
+# - Push to master/main branch
 on:
   workflow_dispatch:
     inputs:
@@ -16,8 +16,7 @@ on:
         required: false
         type: boolean
         default: true
-  pull_request:
-    types: [closed]
+  push:
     branches: [master, main]
 
 env:
@@ -34,10 +33,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   quality-gate:
     name: 🔐 Security & 🧪 Tests
-    # Only run on merged PRs or manual dispatch
-    if: |
-      github.event_name == 'workflow_dispatch' || 
-      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    # Runs on push to master/main or manual dispatch
     runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
     outputs:
       test-success: ${{ steps.validation.outputs.test-success }}
@@ -309,6 +305,7 @@ jobs:
 
       # ─────────────────────────────────────────────────────────────────────
       # 📣 Notify K.PSGallery Pipeline (configurable via input/env/default)
+      #    Note: Step will be skipped if REPO_DISPATCH_TOKEN secret is not set
       # ─────────────────────────────────────────────────────────────────────
       - name: 📣 Notify K.PSGallery Pipeline
         if: env.ENABLE_PSGALLERY_NOTIFICATION == 'true'
