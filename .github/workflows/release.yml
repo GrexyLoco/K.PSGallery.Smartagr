@@ -311,7 +311,8 @@ jobs:
       # 📣 Notify K.PSGallery Pipeline (configurable via input/env/default)
       # ─────────────────────────────────────────────────────────────────────
       - name: 📣 Notify K.PSGallery Pipeline
-        if: secrets.REPO_DISPATCH_TOKEN != ''
+        if: env.ENABLE_PSGALLERY_NOTIFICATION == 'true'
+        continue-on-error: true
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.REPO_DISPATCH_TOKEN }}
