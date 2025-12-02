@@ -43,6 +43,7 @@ jobs:
       skipped-tests: ${{ steps.validation.outputs.skipped-tests }}
       test-duration: ${{ steps.validation.outputs.test-duration }}
       module-name: ${{ steps.discover-module.outputs.module-name }}
+      manifest-valid: ${{ steps.manifest-quality.outputs.manifest-valid }}
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -55,6 +56,19 @@ jobs:
         run: |
           $repoName = '${{ github.event.repository.name }}'
           & "./.github/templates/scripts/Discover-ModuleName.ps1" -RepositoryName $repoName
+
+      - name: 📋 Validate Module Manifest Quality
+        id: manifest-quality
+        shell: pwsh
+        run: |
+          & "./.github/templates/scripts/Test-ModuleManifestQuality.ps1"
+
+      - name: 🛑 Fail on Manifest Errors
+        if: steps.manifest-quality.outputs.manifest-valid == 'false'
+        run: |
+          echo "❌ Module manifest quality gate failed!" >> $GITHUB_STEP_SUMMARY
+          echo "Please fix the manifest errors before publishing." >> $GITHUB_STEP_SUMMARY
+          exit 1
 
       - name: 🧪 Validate PowerShell Module
         id: validation
@@ -448,4 +462,3 @@ jobs:
           "@
           
           Write-Output $summary >> $env:GITHUB_STEP_SUMMARY
-
