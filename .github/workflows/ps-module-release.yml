@@ -152,8 +152,8 @@ jobs:
       - name: 🔧 Configure Git identity
         if: steps.determine-version.outputs.should-release == 'true'
         run: |
-          git config user.name "${{ env.RELEASE_AUTHOR }}"
-          git config user.email "${{ env.RELEASE_EMAIL }}"
+          git config --global user.name "${{ env.RELEASE_AUTHOR }}"
+          git config --global user.email "${{ env.RELEASE_EMAIL }}"
 
       - name: 📝 Update PowerShell Module Version
         if: steps.determine-version.outputs.should-release == 'true'
