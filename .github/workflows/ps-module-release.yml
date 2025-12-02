@@ -146,8 +146,8 @@ jobs:
           exit 0
 
       # ─────────────────────────────────────────────────────────────────────
-      # 📝 Update PSD1 ModuleVersion via K.PSGallery.ManifestVersioning
-      #     CommitChanges=true handles Git commit & push automatically
+      # 📝 Update PSD1 ModuleVersion - Inline approach (no external module)
+      #     TODO: Switch back to K.PSGallery.ManifestVersioning when available on GitHub Packages
       # ─────────────────────────────────────────────────────────────────────
       - name: 🔧 Configure Git identity
         if: steps.determine-version.outputs.should-release == 'true'
@@ -160,11 +160,96 @@ jobs:
         id: update-psd1
         shell: pwsh
         run: |
-          & "./.github/templates/scripts/Update-ManifestVersion.ps1" `
-            -NewVersion '${{ steps.determine-version.outputs.final-version }}' `
-            -BumpType '${{ steps.determine-version.outputs.bump-type }}' `
-            -CommitChanges $true `
-            -TriggeredBy '${{ github.actor }}'
+          Write-Output "🔧 Updating PSD1 ModuleVersion..."
+          
+          # 📝 Summary output
+          "## 📝 PowerShell Module Version Update" >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          
+          # 🔍 Find PSD1 files (search in root and one level deep)
+          $psd1Files = Get-ChildItem -Filter "*.psd1" -File -Recurse -Depth 1
+          
+          if ($psd1Files.Count -eq 0) {
+            Write-Output "⚠️ No PSD1 files found - skipping version update"
+            "⚠️ **No PSD1 files found** - skipping version update" >> $env:GITHUB_STEP_SUMMARY
+            "files-updated=0" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          
+          $newVersion = "${{ steps.determine-version.outputs.final-version }}"
+          Write-Output "📦 New version: $newVersion"
+          
+          "**Target Version:** ``$newVersion``" >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          "### Updated Files:" >> $env:GITHUB_STEP_SUMMARY
+          
+          $updatedCount = 0
+          foreach ($psd1File in $psd1Files) {
+            Write-Output "📝 Updating: $($psd1File.Name)"
+            
+            # 📖 Read current content
+            $content = Get-Content $psd1File.FullName -Raw
+            
+            # 🔍 Extract old version for logging
+            if ($content -match "ModuleVersion\s*=\s*'([^']*)'") {
+              $oldVersion = $Matches[1]
+            } else {
+              $oldVersion = "unknown"
+            }
+            
+            # 🔄 Replace ModuleVersion
+            $updatedContent = $content -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$newVersion'"
+            
+            # ✍️ Write back (UTF8 no BOM for cross-platform)
+            [System.IO.File]::WriteAllText($psd1File.FullName, $updatedContent)
+            
+            Write-Output "✅ Updated $($psd1File.Name): $oldVersion → $newVersion"
+            "- ✅ ``$($psd1File.Name)`` → ``$newVersion`` (was: ``$oldVersion``)" >> $env:GITHUB_STEP_SUMMARY
+            $updatedCount++
+          }
+          
+          "files-updated=$updatedCount" >> $env:GITHUB_OUTPUT
+          Write-Output "✅ Updated $updatedCount PSD1 file(s)"
+
+      - name: 💾 Commit and push version update
+        if: steps.determine-version.outputs.should-release == 'true'
+        run: |
+          # 📋 Check if there are changes
+          if git diff --quiet; then
+            echo "ℹ️ No PSD1 changes to commit"
+            echo "ℹ️ **No PSD1 changes** to commit" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "📝 Committing PSD1 version update..."
+            git add "*.psd1"
+            git commit -m "🔖 Update module version to ${{ steps.determine-version.outputs.final-version }} [skip ci]
+
+          Auto-updated by release workflow
+          - Bump type: ${{ steps.determine-version.outputs.bump-type }}
+          - Triggered by: ${{ github.actor }}"
+            
+            echo "📤 Pushing version update..."
+            git push origin ${{ github.ref_name }}
+            echo "✅ PSD1 version update committed and pushed"
+            
+            # 📝 Summary output
+            echo "### 💾 Git Operations" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **PSD1 version committed and pushed**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 🔒 DISABLED: K.PSGallery.ManifestVersioning approach
+      #     Re-enable when module is available on GitHub Packages
+      # ─────────────────────────────────────────────────────────────────────
+      # - name: 📝 Update PowerShell Module Version (via ManifestVersioning)
+      #   if: steps.determine-version.outputs.should-release == 'true'
+      #   id: update-psd1-module
+      #   shell: pwsh
+      #   run: |
+      #     & "./.github/templates/scripts/Update-ManifestVersion.ps1" `
+      #       -NewVersion '${{ steps.determine-version.outputs.final-version }}' `
+      #       -BumpType '${{ steps.determine-version.outputs.bump-type }}' `
+      #       -CommitChanges $true `
+      #       -TriggeredBy '${{ github.actor }}'
 
       - name: 🔄 Re-fetch after version update
         if: steps.determine-version.outputs.should-release == 'true'
