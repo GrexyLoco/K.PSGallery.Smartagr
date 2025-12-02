@@ -1,0 +1,366 @@
+name: 🚀 PowerShell Module Release Pipeline
+
+# 🎯 Triggers
+# - Manual dispatch with optional version override
+# - Push to master/main branch
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '📌 Override version (e.g., 1.2.3, leave empty for auto-detection)'
+        required: false
+        type: string
+        default: ''
+      enable-psgallery-notification:
+        description: '📣 Enable notification to K.PSGallery pipeline (true/false)'
+        required: false
+        type: boolean
+        default: true
+  push:
+    branches: [master, main]
+
+env:
+  # 🌍 Global Configuration
+  RELEASE_AUTHOR: "github-actions[bot]"
+  RELEASE_EMAIL: "github-actions[bot]@users.noreply.github.com"
+  UBUNTU_VERSION: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
+  # 📣 PSGallery notification: Input > Environment Variable > Default (true)
+  ENABLE_PSGALLERY_NOTIFICATION: ${{ github.event.inputs.enable-psgallery-notification || vars.ENABLE_PSGALLERY_NOTIFICATION || 'true' }}
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 🔐 JOB 1: QUALITY GATE - Security & Tests
+  # ═══════════════════════════════════════════════════════════════════════════
+  quality-gate:
+    name: 🔐 Security & 🧪 Tests
+    # Runs on push to master/main or manual dispatch
+    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
+    outputs:
+      test-success: ${{ steps.validation.outputs.test-success }}
+      total-tests: ${{ steps.validation.outputs.total-tests }}
+      passed-tests: ${{ steps.validation.outputs.passed-tests }}
+      failed-tests: ${{ steps.validation.outputs.failed-tests }}
+      skipped-tests: ${{ steps.validation.outputs.skipped-tests }}
+      test-duration: ${{ steps.validation.outputs.test-duration }}
+      module-name: ${{ steps.discover-module.outputs.module-name }}
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Auto-discover module name
+        id: discover-module
+        shell: pwsh
+        run: |
+          $repoName = '${{ github.event.repository.name }}'
+          & "./.github/templates/scripts/Discover-ModuleName.ps1" -RepositoryName $repoName
+
+      - name: 🧪 Validate PowerShell Module
+        id: validation
+        uses: GrexyLoco/K.Actions.PSModuleValidation@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          module-name: ${{ steps.discover-module.outputs.module-name }}
+
+      - name: 📊 Quality Gate Summary
+        if: always()
+        shell: pwsh
+        run: |
+          $testSuccess = '${{ steps.validation.outputs.test-success }}'
+          $totalTests = '${{ steps.validation.outputs.total-tests }}'
+          $passedTests = '${{ steps.validation.outputs.passed-tests }}'
+          $failedTests = '${{ steps.validation.outputs.failed-tests }}'
+          $skippedTests = '${{ steps.validation.outputs.skipped-tests }}'
+          $duration = '${{ steps.validation.outputs.test-duration }}'
+          $moduleName = '${{ steps.discover-module.outputs.module-name }}'
+          
+          $overallStatus = if ($testSuccess -eq 'true') { '✅ **PASSED**' } else { '❌ **FAILED**' }
+          $failedIcon = if ($failedTests -eq '0') { '✅' } else { '❌' }
+          
+          $summary = @"
+          ## 🔐 Quality Gate Results
+          
+          | Check | Result | Details |
+          |-------|--------|---------|
+          | **🧪 Pester Tests** | $overallStatus | $passedTests/$totalTests passed |
+          | **⏱️ Duration** | ``$duration`` | Test execution time |
+          | **📦 Module** | ``$moduleName`` | Auto-discovered |
+          
+          ### 📊 Test Breakdown
+          | Metric | Count |
+          |--------|-------|
+          | ✅ Passed | ``$passedTests`` |
+          | $failedIcon Failed | ``$failedTests`` |
+          | ⏭️ Skipped | ``$skippedTests`` |
+          | 📋 Total | ``$totalTests`` |
+          
+          ---
+          "@
+          
+          Write-Output $summary >> $env:GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 📦 JOB 2: PREPARE RELEASE - Version Management & PSD1 Update
+  # ═══════════════════════════════════════════════════════════════════════════
+  prepare-release:
+    name: 📦 Prepare Release
+    needs: quality-gate
+    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
+    outputs:
+      new-version: ${{ steps.determine-version.outputs.final-version }}
+      bump-type: ${{ steps.next-version.outputs.bumpType }}
+      should-release: ${{ steps.determine-version.outputs.should-release }}
+      current-version: ${{ steps.next-version.outputs.currentVersion }}
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 🔢 Version Detection: Manual Override vs. Auto-Detection
+      # ─────────────────────────────────────────────────────────────────────
+      - name: ⬆️ Analyze next version
+        id: next-version
+        if: github.event.inputs.version == ''
+        uses: GrexyLoco/K.Actions.NextVersion@latest
+        with:
+          branchName: ${{ github.ref_name }}
+
+      - name: 🔢 Determine final version
+        id: determine-version
+        shell: pwsh
+        run: |
+          & "./.github/templates/scripts/Determine-Version.ps1" `
+            -ManualVersion '${{ github.event.inputs.version }}' `
+            -AutoBumpType '${{ steps.next-version.outputs.bumpType }}' `
+            -AutoNewVersion '${{ steps.next-version.outputs.newVersion }}'
+
+      - name: 🛑 Skip if no changes
+        if: steps.determine-version.outputs.should-release == 'false'
+        run: |
+          echo "## 🔁 No Release Required" >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ No version changes - workflow exits gracefully" >> $GITHUB_STEP_SUMMARY
+          exit 0
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 📝 Update PSD1 ModuleVersion via K.PSGallery.ManifestVersioning
+      #     CommitChanges=true handles Git commit & push automatically
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🔧 Configure Git identity
+        if: steps.determine-version.outputs.should-release == 'true'
+        run: |
+          git config user.name "${{ env.RELEASE_AUTHOR }}"
+          git config user.email "${{ env.RELEASE_EMAIL }}"
+
+      - name: 📝 Update PowerShell Module Version
+        if: steps.determine-version.outputs.should-release == 'true'
+        id: update-psd1
+        shell: pwsh
+        run: |
+          & "./.github/templates/scripts/Update-ManifestVersion.ps1" `
+            -NewVersion '${{ steps.determine-version.outputs.final-version }}' `
+            -BumpType '${{ steps.determine-version.outputs.bump-type }}' `
+            -CommitChanges $true `
+            -TriggeredBy '${{ github.actor }}'
+
+      - name: 🔄 Re-fetch after version update
+        if: steps.determine-version.outputs.should-release == 'true'
+        run: |
+          git fetch origin ${{ github.ref_name }}
+          git reset --hard origin/${{ github.ref_name }}
+          echo "✅ Repository state synchronized"
+
+      - name: 📋 Prepare Release Summary
+        if: always()
+        shell: pwsh
+        run: |
+          $shouldRelease = '${{ steps.determine-version.outputs.should-release }}'
+          $version = '${{ steps.determine-version.outputs.final-version }}'
+          $bumpType = '${{ steps.next-version.outputs.bumpType }}'
+          $currentVersion = '${{ steps.next-version.outputs.currentVersion }}'
+          
+          if ($shouldRelease -eq 'true') {
+            $summary = @"
+          ## 📦 Version Update
+          
+          | Property | Value |
+          |----------|-------|
+          | **Current** | ``$currentVersion`` |
+          | **New** | ``$version`` |
+          | **Bump Type** | ``$bumpType`` |
+          | **Status** | ✅ Ready for release |
+          
+          ---
+          "@
+          } else {
+            $summary = @"
+          ## 📦 Version Analysis
+          
+          ### ℹ️ No Release Required
+          No semantic version changes detected since last tag.
+          
+          > 💡 Use manual workflow dispatch with version override to force a release.
+          
+          ---
+          "@
+          }
+          
+          Write-Output $summary >> $env:GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 🚀 JOB 3: GITHUB RELEASE - Complete Release via Smartagr
+  # ═══════════════════════════════════════════════════════════════════════════
+  github-release:
+    name: 🚀 GitHub Release
+    needs: [quality-gate, prepare-release]
+    if: needs.prepare-release.outputs.should-release == 'true'
+    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
+    outputs:
+      release-created: ${{ steps.create-release.outputs.release-created }}
+      release-tag: ${{ steps.create-release.outputs.release-tag }}
+      release-url: ${{ steps.create-release.outputs.release-url }}
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 🚀 Create Complete Release (via Smartagr: Draft → Smart Tags → Publish)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚀 Create GitHub Release
+        id: create-release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Smartagr handles everything: Draft → Smart Tags (v1, v1.2, latest) → Publish
+          & "./.github/templates/scripts/Create-GitHubRelease.ps1" `
+            -Version "${{ needs.prepare-release.outputs.new-version }}" `
+            -BumpType "${{ needs.prepare-release.outputs.bump-type }}" `
+            -ModuleName "${{ needs.quality-gate.outputs.module-name }}" `
+            -Repository "${{ github.repository }}"
+
+      - name: 📊 Release Summary
+        if: always()
+        shell: pwsh
+        run: |
+          $version = '${{ needs.prepare-release.outputs.new-version }}'
+          $tag = '${{ steps.create-release.outputs.release-tag }}'
+          $moduleName = '${{ needs.quality-gate.outputs.module-name }}'
+          $repo = '${{ github.repository }}'
+          $created = '${{ steps.create-release.outputs.release-created }}'
+          
+          $status = if ($created -eq 'true') { '✅ RELEASED' } else { '❌ FAILED' }
+          
+          $summary = @"
+          ## 🚀 GitHub Release
+          
+          | Property | Value |
+          |----------|-------|
+          | **Version** | ``v$version`` |
+          | **Tag** | ``$tag`` |
+          | **Status** | $status |
+          
+          ### 📦 Installation
+          ``````powershell
+          Install-Module -Name $moduleName -RequiredVersion $version
+          ``````
+          
+          ### 🔗 Links
+          | Link | URL |
+          |------|-----|
+          | **Release** | [v$version](https://github.com/$repo/releases/tag/v$version) |
+          | **Repository** | [$repo](https://github.com/$repo) |
+          
+          ---
+          "@
+          
+          Write-Output $summary >> $env:GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # 📤 JOB 4: PUBLISH TO PACKAGE REPOSITORY
+  # ═══════════════════════════════════════════════════════════════════════════
+  publish-package:
+    name: 📤 Publish to Package Repo
+    needs: [quality-gate, prepare-release, github-release]
+    if: needs.github-release.outputs.release-created == 'true'
+    runs-on: ${{ vars.UBUNTU_VERSION || 'ubuntu-24.04' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📤 Publish to GitHub Packages
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          & "./.github/templates/scripts/Publish-Package.ps1" `
+            -ModuleName "${{ needs.quality-gate.outputs.module-name }}" `
+            -NewVersion "${{ needs.prepare-release.outputs.new-version }}" `
+            -GitHubToken $env:GITHUB_TOKEN `
+            -RepositoryOwner "${{ github.repository_owner }}"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 📣 Notify K.PSGallery Pipeline (configurable via input/env/default)
+      #    Note: Step will be skipped if REPO_DISPATCH_TOKEN secret is not set
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 📣 Notify K.PSGallery Pipeline
+        if: env.ENABLE_PSGALLERY_NOTIFICATION == 'true'
+        continue-on-error: true
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+          repository: grexyloco/K.PSGallery
+          event-type: publish_module
+          client-payload: |
+            {
+              "repo": "${{ github.repository }}",
+              "tag": "v${{ needs.prepare-release.outputs.new-version }}",
+              "bump_type": "${{ needs.prepare-release.outputs.bump-type }}",
+              "triggered_by": "${{ github.actor }}",
+              "source_url": "https://github.com/${{ github.repository }}",
+              "module_name": "${{ needs.quality-gate.outputs.module-name }}",
+              "enable_psgallery_publish": "${{ env.ENABLE_PSGALLERY_NOTIFICATION}}"
+            }
+
+      - name: 📊 Package & Dispatch Summary
+        if: always()
+        shell: pwsh
+        run: |
+          $moduleName = '${{ needs.quality-gate.outputs.module-name }}'
+          $version = '${{ needs.prepare-release.outputs.new-version }}'
+          $psgalleryEnabled = '${{ env.ENABLE_PSGALLERY_NOTIFICATION }}'
+          
+          $summary = @"
+          ## 📤 Package Publishing
+          
+          | Property | Value |
+          |----------|-------|
+          | **Module** | ``$moduleName`` |
+          | **Version** | ``$version`` |
+          | **Target** | GitHub Packages |
+          | **PSGallery Dispatch** | ``$psgalleryEnabled`` |
+          
+          ### 📣 Next Steps
+          
+          | Step | Status |
+          |------|--------|
+          | 📦 GitHub Packages | ✅ Published |
+          | 📣 K.PSGallery Dispatch | $(if ($psgalleryEnabled -eq 'true') { '✅ Triggered' } else { '⏭️ Skipped' }) |
+          | 🚀 PowerShell Gallery | $(if ($psgalleryEnabled -eq 'true') { '⏳ Pending' } else { '⏭️ Skipped' }) |
+          
+          ---
+          **🎉 Release pipeline complete!**
+          "@
+          
+          Write-Output $summary >> $env:GITHUB_STEP_SUMMARY
+
