@@ -132,15 +132,28 @@ function Test-MeaningfulValue {
         return $false
     }
     
-    # Check for placeholder/dummy values
-    $placeholders = @(
+    # Check for EXACT placeholder/dummy values only
+    # These are strings that are EXACTLY these values, not containing them
+    $exactPlaceholders = @(
         'Unknown', 'TODO', 'TBD', 'N/A', 'None', 'Test', 
         'Author', 'Company', 'Description', 'Your Name',
-        'your-name', 'your-company', 'example.com'
+        'your-name', 'your-company', 'MyModule', 'Module1',
+        'SampleModule', 'ExampleModule', 'TestModule'
     )
     
-    foreach ($placeholder in $placeholders) {
-        if ($Value -eq $placeholder -or $Value -like "*$placeholder*") {
+    # Only check for exact matches (case-insensitive)
+    if ($Value -in $exactPlaceholders) {
+        return $false
+    }
+    
+    # Check for domain placeholders (these ARE checked as patterns)
+    $domainPatterns = @(
+        'example.com', 'example.org', 'your-domain', 
+        'placeholder', 'changeme', 'yourname'
+    )
+    
+    foreach ($pattern in $domainPatterns) {
+        if ($Value -like "*$pattern*") {
             return $false
         }
     }
@@ -237,47 +250,57 @@ Write-Output "──────────────────────
 # ─────────────────────────────────────────────────────────────────────────────
 
 foreach ($field in $RequiredFields) {
-    $value = $manifest.($field.Name)
+    # Map field names to actual PSModuleInfo properties 
+    # (Test-ModuleManifest uses 'Version' instead of 'ModuleVersion')
+    $propertyName = switch ($field.Name) {
+        'ModuleVersion' { 'Version' }
+        default { $field.Name }
+    }
     
-    if ([string]::IsNullOrWhiteSpace($value)) {
+    $value = $manifest.$propertyName
+    
+    # Convert to string for consistent handling (Version objects, etc.)
+    $valueStr = if ($null -eq $value) { '' } else { $value.ToString() }
+    
+    if ([string]::IsNullOrWhiteSpace($valueStr)) {
         Write-ValidationError -Message "Missing required field: $($field.Name) ($($field.Description))" -Field $field.Name
     }
-    elseif (-not (Test-MeaningfulValue -Value $value -FieldName $field.Name)) {
-        Write-ValidationError -Message "Invalid/placeholder value for $($field.Name): '$value'" -Field $field.Name
+    elseif (-not (Test-MeaningfulValue -Value $valueStr -FieldName $field.Name)) {
+        Write-ValidationError -Message "Invalid/placeholder value for $($field.Name): '$valueStr'" -Field $field.Name
     }
     else {
         # Additional format validation
         switch ($field.Name) {
             'GUID' {
-                if (-not (Test-GuidFormat -Value $value)) {
-                    Write-ValidationError -Message "Invalid GUID format: '$value'" -Field 'GUID'
+                if (-not (Test-GuidFormat -Value $valueStr)) {
+                    Write-ValidationError -Message "Invalid GUID format: '$valueStr'" -Field 'GUID'
                 } else {
-                    Write-ValidationSuccess "$($field.Name): $value"
+                    Write-ValidationSuccess "$($field.Name): $valueStr"
                 }
             }
             'ModuleVersion' {
-                if (-not (Test-VersionFormat -Value $value)) {
-                    Write-ValidationError -Message "Invalid version format: '$value'" -Field 'ModuleVersion'
+                if (-not (Test-VersionFormat -Value $valueStr)) {
+                    Write-ValidationError -Message "Invalid version format: '$valueStr'" -Field 'ModuleVersion'
                 } else {
-                    Write-ValidationSuccess "$($field.Name): $value"
+                    Write-ValidationSuccess "$($field.Name): $valueStr"
                 }
             }
             'Author' {
-                if ($value.Length -lt 2) {
-                    Write-ValidationError -Message "Author name too short: '$value'" -Field 'Author'
+                if ($valueStr.Length -lt 2) {
+                    Write-ValidationError -Message "Author name too short: '$valueStr'" -Field 'Author'
                 } else {
-                    Write-ValidationSuccess "$($field.Name): $value"
+                    Write-ValidationSuccess "$($field.Name): $valueStr"
                 }
             }
             'Description' {
-                if ($value.Length -lt 20) {
-                    Write-ValidationWarning -Message "Description is very short ($($value.Length) chars): '$value'" -Field 'Description'
+                if ($valueStr.Length -lt 20) {
+                    Write-ValidationWarning -Message "Description is very short ($($valueStr.Length) chars): '$valueStr'" -Field 'Description'
                 } else {
-                    Write-ValidationSuccess "$($field.Name): $($value.Substring(0, [Math]::Min(60, $value.Length)))..."
+                    Write-ValidationSuccess "$($field.Name): $($valueStr.Substring(0, [Math]::Min(60, $valueStr.Length)))..."
                 }
             }
             default {
-                Write-ValidationSuccess "$($field.Name): $value"
+                Write-ValidationSuccess "$($field.Name): $valueStr"
             }
         }
     }
@@ -293,9 +316,19 @@ Write-Output "──────────────────────
 # ─────────────────────────────────────────────────────────────────────────────
 
 foreach ($field in $RecommendedFields) {
-    $value = $manifest.($field.Name)
+    # Map manifest property names (Test-ModuleManifest returns different property names)
+    $propName = switch ($field.Name) {
+        'FunctionsToExport' { 'ExportedFunctions' }
+        default { $field.Name }
+    }
+    $value = $manifest.($propName)
     
-    if ([string]::IsNullOrWhiteSpace($value) -or ($value -is [array] -and $value.Count -eq 0)) {
+    # Handle dictionary types (ExportedFunctions returns ReadOnlyDictionary)
+    if ($value -is [System.Collections.IDictionary]) {
+        $value = $value.Keys
+    }
+    
+    if ([string]::IsNullOrWhiteSpace($value) -or ($value -is [array] -and $value.Count -eq 0) -or ($value -is [System.Collections.ICollection] -and $value.Count -eq 0)) {
         Write-ValidationWarning -Message "Missing recommended field: $($field.Name) ($($field.Description))" -Field $field.Name
     } else {
         if ($value -is [array]) {
